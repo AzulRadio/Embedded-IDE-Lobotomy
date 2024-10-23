@@ -2,13 +2,12 @@
 
 2024.10
 
-If you have some experience with programming embedded system from an IDE, the following might sound familiar to you:
+If you have some experience with programming embedded system from an IDE like Code Composer Studio, Keil, or STM32CubeIDE, you might have experienced the same phase as I did:
 
-You want to start a new project, so you copy and paste the same IDE project template you inherit from your ex-colleague long long ago and start to write some C code. You stoped wondering what kept this template running and why moving a single header file out of its place will lead to compilation errors long ago. Surly the dependency management is a mess, whenever you need to add a new library you just drag and drop a copy into the project folder. If your code complains a header file is not found, just change `#include "header.h"` to `#include "../inc/header.h"` and the magic button `Build` will solve all the problems.
+You want to start a new project, so you copy and paste the same IDE project template you've been using since day 1. You are not sure what keeps this template running but you know moving a single header file around will definitely cause compilation errors. The dependency management is a mess, and even if you want to import a new library you are not sure where to put it. If the IDE complains a header file is not found, the only fix you know is to change `#include "header.h"` to `#include "../inc/header.h"`, click on `Build`, and hope it would work.
 
-But wouldn't it be nice if we know what is actually going on behind the GUI? Under the cover of IDE lives some curious binary creatures which make a pipeline to convert your C code to a working program on MCUs, and this guide will give you an introduction to their habbits and how to interact with them.
-
-> Content in the quotation cell like this one are for more experienced readers.
+I've been through the same phaes and today I still can't say confidently I've left this phase of ignorance. However, I did put many efforts to find out what is happening behind an embedded IDE. And that, is why I wrote this tutorial:
+ **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**. To write down my findings and share them with others that have the same curiocity.
 
 ## Compile from commandline on PC
 
