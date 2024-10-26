@@ -74,36 +74,193 @@ It takes 4 steps to convert this source file into an executable: preprocessing, 
 https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf
 
 ## How to control peripherals on MCU (Registers, Memory map, and Libraries)
-There are always many, many library source files in a embedded IDE project folder, but why do we need this many? The reason comes from to how we control peripherals in embedded systems.
 
-There are 2 ways of controlling peripherals: **memory map** and **port map**. Either way needs hardware in CPU to support it. That's said, when designing a CPU, we need to decide what (and how many) hardware the CPU can access.
+There are always many, many library source files in a embedded IDE project folder, but why do we need this many? In this chapter we will introduce the hierarchy of library for embedded system.
 
-For port map, CPU uses special assembly commands to access peripherals. Our focus for this chapter is memory map, which is accessing peripherals with the same assembly commands like a real memory address.
+Let's start with an overview of all 4 layers of libraries of an embedded project. There are 4 layers: **Register level control** and **MCU library (manufacturer library)** are provided by the chip manufacturer; **bsp library** and **non-bsp library (higher level library)** are written by the user (you).
 
-When CPU want to access some memory address, the address will be sent to memory management unit (a hardware inside CPU). Some address are permanently directed to peripherals instead of memories.
+> Disclaimer: This is only the way I use to structure the project and by no means is a universal standard.
 
-For example, if our CPU uses 4 bits to express any address, each address is 1 byte on memory, and the memory chip has only 8 bytes.
+![](./resource/bsp_vs_non_bsp.png)
 
-Then the memory mapping can be like this:
+#### Register level control
 
+At the very bottom is the **register level control**. All actions of a MCU is controlled by changing values of some registers. For example, to change the behavior of a GPIO between input mode and output mode, we need to change the control register of input/output multiplexer.
+
+The code for register level control usually look like this:
+
+```C
+Blink an LED on MCU STC89C52
+sfr and sbit are special data type defined for these MCUs
+
+/*  BYTE Registers  */
+sfr P0    = 0x80;
+sfr P1    = 0x90;
+sfr P2    = 0xA0;
+sbit led = P2^0;
+
+int main() {
+  while(1) {
+    led = 0;
+    delay(5000);
+    led = 1;
+  }
+}
 ```
-0000b - 0111b 8 bytes memory
-1000b - 1111b 8 GPIO pins
+
+#### MCU library (manufacturer library)
+
+On top of register layer is what I called the "manufacturer library". When we program at the register level, you always need to know the **memory address** of a register to control it, which is tedious. So many MCU manufacturers write their library and you, the user, don't need to care about these registers. For example, `HAL` for `stm32` family, `Driverlib` for `TI C2000` family.
+
+The code for MCU library level usually look like this:
+```C
+Blink an LED on MCU STM32F1
+...
+while (1)
+{
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, 0);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, 1);
+}
+...
 ```
 
-We decide our CPU should permanently map `1000b - 1111b` to 8 GPIO pins with hardware circuits, so every time CPU reads a memory in this range, memory management unit gives it the values from GPIO pins. CPU doesn't know or care it is reading from real memory or peripherals.
+Another benefit is many MCUs from the same family can use the same manufacturer library API. Now we are using `STM32F1`. If we want to switch to its close relative `STM32F4`, we can use the same piece of user code to blink LED on our new MCU.
 
-One possible implementation of such hardware circuit, is to wire the most significant bit of the memory address register to a multiplex that select from the return values of memory chip and GPIO.
+#### Non-bsp library (high level library)
 
-// TODO finish this chapter
+The entire point of bsp library is to make higher level library cross platform, so let's skip the bsp library for now and look at what non-bsp library is trying to do. The high level library's API depends on what embedded system you (the user) want to build. If designed properly, controlling your system with your high level library should be very convenient.
+
+Suppose we want to build an LED array to display numbers and use PWM to control brightness. Sounds very complicated, but with properly designed high level library, our final user code using the high level library might look as simple as this:
+
+```C
+Display 4 on an LED array
+
+led_array_t led_array = {some initialization here};
+int main() {
+  while (1) {
+    DisplayNumber(led_array, 4);
+    SetBrightness(led_array, 0.5); // Set brightness to 50%
+  }
+}
+```
+#### bsp library
+
+Now we return to the bsp library. The bsp library is the bridge layer between MCU library and high level library. We define a common API between higher level library and bsp library. Then implement this common API with MCU library.
+
+For example, if we want to implement the `SetBrightness()` function in the example above, with `stm32`'s `HAL` library, the implementation might be like this:
+```C
+in led_array.c, high level library
+void SetBrightness(led_array_t *dev, float input) {
+  SetPWM(dev, input);
+}
+
+in bsp_pwm.c, bsp library
+// I didn't test this
+void SetPWM(led_array_t *dev, float input) {
+  uint32_t compare = input * dev->TIME_PERIOD;
+  __HAL_TIM_SET_COMPARE(dev->htim, dev->channel, compare);
+}
+```
+
+With `TI C2000`'s `Driverlib`, the implementation might be like this:
+```C
+in led_array.c, high level library
+void SetBrightness(led_array_t *dev, float input) {
+  SetPWM(dev, input);
+}
+
+in bsp_pwm.c, bsp library
+// I didn't test this
+void SetPWM(led_array_t *dev, float input) {
+  uint32_t compare = input * dev->TIME_PERIOD;
+  EPWM_setCounterCompareValue(dev->pwm_base, dev->compare_id, compare);
+}
+```
+
+Since we defined the common API `SetPWM()`, The implementation of high level library gets to stay the same across different MCUs. This is what we meant by cross-platform. **If we change to a slightly different MCU or the MCU library changes, the common API between bsp library and high level library allow us to only change bsp library implementation, instead of all the final user code or high level libraries.**
 
 ## How to compile lots of source files (makefile and CMake)
 
+With all the libraries we introduced in the last chapter, there will be numerous source files in the project and their number will keep increasing. We can't do this the same way as chapter 1 and we need an automatic way to manage these compilation. So, we introduce `makefile` and `CMake`.
 
+There are many makefile and CMake tutorials but I feel many of them failed to stress on the core idea of **target**. So I'm writing another one as a supplementary to those tutorials. You might want to read this chapter before looking at the other CMake/makefile tutorials.
+
+Suppose we have 2 source files, `hello.c` and `main.c`. We want to compile these 2 source files into an executable. From the first chapter **compiling from commandline** we know how to do this with `gcc`:
+
+```
+gcc hello.c main.c
+```
+
+If we want the output executable to have name `main.elf`, put it in folder `build/` specify that we are using `C11` standard, and add a hidden `#define DEBUG` macro to enable some debug setting in the source code, the command would be:
+
+```
+gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
+```
+
+As there are more parameters we would like to add, the command grows longer. **Makefile** is a script language that allows us not to type the long command every time. Now we only need to type:
+
+```
+make build/main.elf
+```
+
+> To do this with MinGW on Windows, you need to rename `mingw32-make.exe` to `make.exe`
+
+`make` will look for a file called `makefile` in the directory it is called and execute the commands in it. Let's look at what `makefile` have in our example:
+
+```
+build/main.elf: hello.c main.c
+    gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
+```
+
+`build/main.elf` is the **target** (this is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command if the target doesn't exist.
+
+`hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. If we have a dependency tree, only building necessary files will save a lot of time.
+
+Command is just command. Notice it has to be a `tab` before the command and cannot be `whitespace`.
+
+Now we know the 2 conditions for a command to run: target doesn't exist or dependencies are changed. We can write some interesting makefile scripts.
+
+If the target is not created by the command, then this command will run every time we `make` because the target is always missing. For example:
+
+```
+clean:
+    rm *.out *.elf
+```
+
+If we run `make clean`, all `.out` and `.elf` files will be removed in the current directory.
+
+#### CMake
+
+CMake is when makefile is too long, and we need to write another script to generate the makefile script. Many tutorials on CMake are elaborated on usage details which makes them confusing and wordy, but all you need to know is: **CMake is (like makefile) all about targets**.
+
+Remember makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles, if no targets are defined, no makefile will be generated by this CMake.
+
+There are only 3 functions that defines targets in CMake:
+
+```
+# Executables that you can generate with GCC or GCC-like compilers
+add_executable()
+
+# Libraries (.a/.so files) that you can generate with GCC or GCC-like compilers
+add_library()
+
+# Something that generated from other commandline tools
+# Example: python script that generate files
+# ...Or nothing, remember make clean?
+# We can use this to load programs to MCUs
+add_custom_target()
+```
+
+That's it. That's core idea about CMake. **No matter how many variables you defined or how many `execute_process()` you added, if there is no target to be generated, none of the CMake commands will be executed.**
+
+With that in mind you should be able to understand most of the CMake tutorials available.
+
+> CMake is a very deep rabbit hole and how deep you decide to go in is up to you. I've warned you.
 
 - Why PC can compile against MCU (Cross-compile and Toolchain)
 - How the MCU knows what code to run (Load and Reset)
-- How debugging works (OpenOCD, GDB, SWD vs JTAG, debug probe, gdb server)
+- How debugging works (OpenOCD, GDB, gdb server)
 
 ## What's inside a loader/debug probe/emulator
 
