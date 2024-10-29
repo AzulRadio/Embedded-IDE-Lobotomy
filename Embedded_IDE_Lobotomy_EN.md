@@ -33,7 +33,7 @@ UCLA has a good short tutorial on how to use gcc to compile C/C++ program: `http
 
 Let's take a look at what we have.
 
-```
+```bash
 gcc main.c
 ```
 
@@ -66,7 +66,7 @@ Because when we load programs to embedded MCU without an OS, these OS instructio
 Most "compilers" today are drivers that call compiler, assembler, and linker depending on the file input.
 
 When we call:
-```
+```bash
 gcc main.c
 ```
 
@@ -188,19 +188,19 @@ There are many makefile and CMake tutorials but I feel many of them failed to st
 
 Suppose we have 2 source files, `hello.c` and `main.c`. We want to compile these 2 source files into an executable. From the first chapter **compiling from commandline** we know how to do this with `gcc`:
 
-```
+```bash
 gcc hello.c main.c
 ```
 
 If we want the output executable to have name `main.elf`, put it in folder `build/` specify that we are using `C11` standard, and add a hidden `#define DEBUG` macro to enable some debug setting in the source code, the command would be:
 
-```
+```bash
 gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
 
 As there are more parameters we would like to add, the command grows longer. **Makefile** is a script language that allows us not to type the long command every time. Now we only need to type:
 
-```
+```bash
 make build/main.elf
 ```
 
@@ -208,7 +208,7 @@ make build/main.elf
 
 `make` will look for a file called `makefile` in the directory it is called and execute the commands in it. Let's look at what `makefile` have in our example:
 
-```
+```makefile
 build/main.elf: hello.c main.c
     gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
@@ -223,7 +223,7 @@ Now we know the 2 conditions for a command to run: target doesn't exist or depen
 
 If the target is not created by the command, then this command will run every time we `make` because the target is always missing. For example:
 
-```
+```makefile
 clean:
     rm *.out *.elf
 ```
@@ -238,7 +238,7 @@ Remember makefile is all about targets and every line in makefile is about gener
 
 There are only 3 functions that defines targets in CMake:
 
-```
+```Python
 # Executables that you can generate with GCC or GCC-like compilers
 add_executable()
 
@@ -252,13 +252,57 @@ add_library()
 add_custom_target()
 ```
 
+The first two functions `add_executable()` and `add_library()` will detect if the target is created and if the dependencies are changed as `makefile` does. The third function `add_custom_target()`, however, will execute no matter what. Thus a little trick with `add_custom_target()` is to use it with loader binary like:
+
+```c
+add_custom_target(flash-${name}
+    COMMAND st-flash --reset write ${BIN_FILE} 0x8000000
+    DEPENDS ${name}.elf)
+```
+
+Now every time we run `make flash-<your binary name>` like `make flash-led`, the corresponding binary, in this case, `led.elf` will be loaded to your MCU with `st-flash`, a binary loader for `STM32` MCU family.
+
 That's it. That's core idea about CMake. **No matter how many variables you defined or how many `execute_process()` you added, if there is no target to be generated, none of the CMake commands will be executed.**
 
 With that in mind you should be able to understand most of the CMake tutorials available.
 
 > CMake is a very deep rabbit hole and how deep you decide to go in is up to you. I've warned you.
 
-- Why PC can compile against MCU (Cross-compile and Toolchain)
+## Why PC can compile against MCU (Cross-compile and Toolchain)
+
+To compile a source file to an executable. We can simply do:
+
+```bash
+gcc main.c
+```
+
+Recall the very beginning of our **chapter 1: compile from commandline on PC**, we know that:
+
+1. Different MCU/CPUs speak different machine code
+2. Executable for one platform (CPU + OS) cannot run on another platform.
+
+These are the two primary reasons for having compilers, to translate source code into corresponding machine code. Wait! When we compile for a embedded system on PCs, how can the program run on the embedded MCU even if it is compiled on a PC? The answer is what we called **cross-compile**.
+
+Let's examine the difference between **compile** and **cross-compile**:
+
+![](./resource/cross_compile.png)
+
+For a source file `.c`, if we want to run it on our PC, we compile it with `gcc`; if we want to run it on our ARM architecture embedded system MCU, we cross-compile it with `arm-gcc`, a cross-compiler on our PC, and then generated executable can run on our embedded system.
+
+`arm-gcc`, the cross-compiler, is one of the **cross-compiling toolchain** provided by the architecture designer. If we are using ARM MCUs, we can get our cross-compiling toolchain from ARM: [ARM Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads). This is a GNU Arm Toolchain, meaning it is an variation of the `gcc` family we've been talking about in the previous chapters and compatible to `makefile` and `CMake`. The usage is exactly the same as compiling against our PC.
+
+#### Example:
+
+Suppose our PC is x86-64 Ubuntu and our MCU is ARM architecture STM32F4. This is a **bare-metal target**, which means it doesn't have any operating systems on it. So the cross-compiling toolchain we get is `x86_64 Linux hosted cross toolchains AArch32 bare-metal target (arm-none-eabi)` and our cross-compiler is `arm-none-eabi-gcc`.
+
+To use these in our `CMake` script, add the following commands:
+
+```cmake
+set(CMAKE_C_COMPILER arm-none-eabi-gcc)
+set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+```
+
+
 - How the MCU knows what code to run (Load and Reset)
 - How debugging works (OpenOCD, GDB, gdb server)
 
