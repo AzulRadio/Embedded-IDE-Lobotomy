@@ -17,7 +17,7 @@ Computers speak machine code of 0's and 1's and each CPU family speaks a little 
 
 Writing program in machine code for every CPU ever built is impractical. So people decided to write program in a higher level language (C/C++). If each CPU can have their own translator from this higher level language to their machine code, a program can run on any CPU. This translator is called the "compiler".
 
-> And the ability to run on different CPU families is called "cross platform". Like Python can run on ARM and x86.
+> And the ability to run on different CPU families is called "cross platform". Like Python can run on ARM and x86 desktops.
 
 #### GCC
 
@@ -25,13 +25,13 @@ Writing program in machine code for every CPU ever built is impractical. So peop
 
 > **Actually, most "compilers" today are drivers that call compiler, assembler, or linker depending on the input file and command.
 
-Getting `gcc` on Linux is trivial. If you are on Windows, you can use a Linux virtual machine (I use `vmware player 17` + `Ubuntu 22.04`). Or, use `MinGW-W64` + `Git Bash` (remember to add `mingw64/bin` to system PATH) if you choose this way.
+Getting `gcc` on Linux is trivial. If you are on Windows, you can use a Linux virtual machine (I use `vmware player 17` + `Ubuntu 22.04`) or `MinGW-W64` + `Git Bash` (remember to add `mingw64/bin` to system PATH if you choose this way).
 
-UCLA has a good short tutorial on how to use gcc to compile C/C++ program: `https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html`
+UCLA has a good [one-page tutorial](https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html) on how to use gcc to compile C/C++ program:
 
 #### .exe, .out, and .elf
 
-Let's take a look at what we have.
+Let's take a look at what we have for gcc compilers.
 
 ```bash
 gcc main.c
@@ -59,7 +59,7 @@ So what are this extra OS specific information? Instructions for the OS about ho
 
 Okay but why do we care about these different executables and additional information for OS?
 
-Because when we load programs to embedded MCU without an OS, these OS instructions are not needed. We can't load `.exe` or `.elf` to MCUs. Instead, we load binary files `.hex` or `.bin`, which only contain machine code and data that will loaded to a fixed memory address based on CPU design by a external hardware loader. Program counter of the MCU returns to this address and starts running every time we power up, press reset button, or perform a software reset.
+Because when we load programs to embedded MCU without an OS, these OS instructions are not needed. We can't load `.exe` or `.elf` to MCUs. Instead, we load binary files `.hex` or `.bin`, where everything (code/data) has a fixed address to a fixed memory address based on CPU design with a external hardware loader. Program counter of the MCU returns to this fixed memory address and starts running every time we reset the MCU.
 
 #### Mildly more advanced compiling
 
@@ -70,8 +70,8 @@ When we call:
 gcc main.c
 ```
 
-It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking. There are many excellent tutorials on this topic. I would not redo their work. I found this course slide from University of North Carolina at Charlotte, Introduction to Computer Architecture very helpful:
-https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf
+It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking. There are many excellent tutorials on this topic. I would not redo their work. I found this lecture slide from University of North Carolina at Charlotte, [Introduction to Computer Architecture](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf) very helpful:
+
 
 ## How to control peripherals on MCU (Registers, Memory map, and Libraries)
 
@@ -213,13 +213,13 @@ build/main.elf: hello.c main.c
     gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
 
-`build/main.elf` is the **target** (this is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command if the target doesn't exist.
+`build/main.elf` is the **target** (which is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command if the target doesn't exist.
 
 `hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. If we have a dependency tree, only building necessary files will save a lot of time.
 
 Command is just command. Notice it has to be a `tab` before the command and cannot be `whitespace`.
 
-Now we know the 2 conditions for a command to run: target doesn't exist or dependencies are changed. We can write some interesting makefile scripts.
+Now we know the 2 conditions for a command to run: **target doesn't exist or dependencies are changed**. We can write some interesting makefile scripts.
 
 If the target is not created by the command, then this command will run every time we `make` because the target is always missing. For example:
 
@@ -228,13 +228,25 @@ clean:
     rm *.out *.elf
 ```
 
-If we run `make clean`, all `.out` and `.elf` files will be removed in the current directory.
+If we run `make clean`, `makefile` will look for a file called `clean` in the current directory. Since there is no such file, the command will run and all `.out` and `.elf` files will be removed in the current directory.
+
+> If there is such a file called `clean`, please refer to the makefile keyword: `.PHONY`
 
 #### CMake
 
-CMake is when makefile is too long, and we need to write another script to generate the makefile script. Many tutorials on CMake are elaborated on usage details which makes them confusing and wordy, but all you need to know is: **CMake is (like makefile) all about targets**.
+CMake is when our makefile is so long that we need to write another script to generate the makefile script. While `makefile` looks for a file named `makefile` in the current directory, `CMake` looks for a file named `CMakeLists.txt`. The most common use case is:
 
-Remember makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles, if no targets are defined, no makefile will be generated by this CMake.
+```bash
+mkdir build
+cd build
+cmake ..
+make <your target name>
+```
+
+
+Many tutorials on CMake focus too much on usage details which, in my opinion, makes them confusing and wordy. When you read these tutorials, keep in mind one thing: **(like makefile), CMake is all about targets**.
+
+Remember makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles. **If no targets are defined, no action will be taken by this CMake.**
 
 There are only 3 functions that defines targets in CMake:
 
@@ -287,6 +299,8 @@ Let's examine the difference between **compile** and **cross-compile**:
 
 ![](./resource/cross_compile.png)
 
+> This graph is not quite accurate as `.elf` does not directly run on bare-metal embedded system and extra post-processing steps are needed.
+
 For a source file `.c`, if we want to run it on our PC, we compile it with `gcc`; if we want to run it on our ARM architecture embedded system MCU, we cross-compile it with `arm-gcc`, a cross-compiler on our PC, and then generated executable can run on our embedded system.
 
 `arm-gcc`, the cross-compiler, is one of the **cross-compiling toolchain** provided by the architecture designer. If we are using ARM MCUs, we can get our cross-compiling toolchain from ARM: [ARM Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads). This is a GNU Arm Toolchain, meaning it is an variation of the `gcc` family we've been talking about in the previous chapters and compatible to `makefile` and `CMake`. The usage is exactly the same as compiling against our PC.
@@ -302,13 +316,29 @@ set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 ```
 
+The compiled result from arm toolchain compiler is a `.elf` file we discussed in the first chapter.
 
-- How the MCU knows what code to run (Load and Reset)
-- How debugging works (OpenOCD, GDB, gdb server)
+> Sometimes this result file is also referred as a `.axf` file, ARM executable file.
+
+An `.elf` file contains information for operating system about relocation: how to place different sections of data and code into memory. A bare-metal embedded MCU cannot interpret these information so we need to make everything fixed before loading the program.
+
+The tool we use here is `objcopy`, it converts `.elf` file into binary files `.bin` or `.hex`.
+
+```bash
+arm-none-eabi-objcopy -Obinary intput.elf output.bin
+```
+
+Now we can load the program into our MCU. Here we use the open source `stlink` library:
+
+```bash
+st-flash --reset write output.bin 0x8000000
+```
+
+Here `0x8000000` is the start address used by our MCU `STM32F4`. For different MCUs, we need to consult the chip technical manual for this flash address. An MCU always start running code from this address after a reset.
 
 ## What's inside a loader/debug probe/emulator
 
-To load and debug code in a MCU, we need a "loader". It looks something like this:
+As the one last step to load and debug code in a MCU, we need a "loader". It looks something like this:
 
 <img src="./resource/st-link-v2.jpg" alt="Source: https://www.amazon.com/CANADUINO-Compatible-Circuit-Programmer-Debugger/dp/B07B2K6ZPK" height="200"/>
 
@@ -400,5 +430,48 @@ For some MCU families, the FTDI chip and the middle chip is combined into one. F
 <img src="./resource/st-link-v2-mini-1_1_5.jpg" alt="Source: https://www.waveshare.com/st-link-v2-mini-stm32.htm" height="200"/>
 <br><br>
 
+## How debugging works (OpenOCD, GDB, gdb server)
 
-- Case analysis with `illini-robomaster`
+`GDB` (GNU Debugger) is a very important tool for debugging. There are many tutorials about it. Like [this lecture slide](https://www.cs.umd.edu/~srhuang/teaching/cmsc212/gdb-tutorial-handout.pdf) from University of Maryland or [this one page reference sheet](https://web.eecs.umich.edu/~sugih/pointers/summary.html) from University of Michigan.
+
+Most intro level GDB tutorials only talk about debugging local program, which compiles, runs, and debugs all on your computer. For a program loaded into embedded MCUs, we know it compiles on your computer, but doesn't run on your computer. From the previous chapter we know we can debug it with a debug probe, but how do we do that?
+
+If we want to debug our MCU through the debug probe with GDB and GDB commands, we need a software middle-man between GDB and debug probe. The thing we are looking for is called a **GDB server**. It reads GDB commands sent to a port* and translate it to corresponding commands of the debug probe.
+
+>*socket port, which means you can debug a MCU through network remotely.
+
+The GDB server we use here as an example is **OpenOCD**. Since there are so many different debug probes, we need to find the **debug probe configuration file** for our debug probe. OpenOCD comes with many common debug probe config files including the one we are using for example: `st-link-v2.1`.
+
+To set up the GDB server:
+
+```bash
+openocd -f st-link-v2-1.cfg
+```
+
+If debug probe is connected to our computer, OpenOCD should detect it and wait for GDB to connect.
+
+1. Suppose we compiled our program as output.elf
+```bash
+arm-none-eabi-gcc -g main.c -o output.elf
+```
+
+2. To launch the GDB:
+```bash
+arm-none-eabi-gdb output.elf
+```
+This gives the program we are debugging to GDB. Notice that we have not loaded this program into the MCU. Loading will be done by GDB + OpenOCD in step 4.
+
+3. Run GDB command:
+```bash
+target extended-remote : 3333
+```
+This let GDB connects to GDB server at port 3333, which is the default port of OpenOCD. `extended-remote` makes sure that even the program on the MCU ends, GDB doesn't quit connection with gdbserver so we can restart the program on the MCU. On the other hand, `target remote: 3333` will quit once the program finishes.
+
+4. Run GDB Command:
+```bash
+load
+```
+This will load the program we are debugging to our MCU. From here we can debug in GDB the same as debugging any other program.
+
+
+## Case analysis with `illini-robomaster`

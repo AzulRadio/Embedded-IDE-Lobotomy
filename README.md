@@ -46,12 +46,12 @@ I can't make up more, but I'm sure you know what you are doing if you read this 
 > Removing IDE from you life is just like having Lobotomy: no more pain for your life without absolutely zero side effect!
 
 ### Index
-- Compile from commandline on a PC
-- How to control peripherals on a MCU (Registers, Memory map, and Libraries)
+= Compile from commandline on PC
+= How to control peripherals on MCU (4 layers of libraries we need to compile)
 - How to compile lots of source files (makefile and CMake)
 - Why PC can compile against MCU (Cross-compile and Toolchain)
-- How the MCU knows what code to run (Load and Reset)
-- How debugging works (OpenOCD, GDB, SWD vs JTAG, debug probe, gdb server)
+- What's inside a loader/debug probe/emulator
+- How debugging works (OpenOCD, GDB, gdb server)
 - Case analysis with `illini-robomaster`
 
 ---
