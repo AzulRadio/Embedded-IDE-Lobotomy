@@ -73,7 +73,7 @@ gcc main.c
 It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking. There are many excellent tutorials on this topic. I would not redo their work. I found this lecture slide from University of North Carolina at Charlotte, [Introduction to Computer Architecture](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf) very helpful:
 
 
-## How to control peripherals on MCU (Registers, Memory map, and Libraries)
+## How to control peripherals on MCU (4 layers of libraries we need to compile)
 
 There are always many, many library source files in a embedded IDE project folder, but why do we need this many? In this chapter we will introduce the hierarchy of library for embedded system.
 
