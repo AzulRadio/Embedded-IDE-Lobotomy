@@ -2,11 +2,13 @@
 
 2024.10
 
-If you have ever spent some time programming an embedded system, you will know working with embedded IDEs (Code Composer Studio, Keil, or STM32CubeIDE) is not a very pleasant experience. They are not only clumsy and easily crash, but also confusing because they hide everything under a GUI.
+If you have ever spent some time programming an embedded system, you might agree that working with embedded IDEs is not a very pleasant experience. Code Composer Studio, Keil, STM32CubeIDE... they are clumsy and confusing as they hide everything under a GUI.
 
-To get rid of the IDE, I put many efforts to find out what is happening behind an embedded IDE. I still can't say with confidence that I've left the phase of ignorance today, but I learned many interesting stuff. And that, is why I wrote this tutorial:
+To get rid of embedded IDEs, I put many efforts to find out what is happening behind them. Today, I still can't say confidently that I've learnt everything about them, but I went through many interesting topics, interesting enough for me to **replace every part of an IDE with some open sourced command-line tools.**
 
-To write down my findings and to share with those who have the same curiocity. **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**.
+Then, I met some other people with the same interest, which gave me a reason to write down my findings. That's why I wrote this beginner's guide: **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**.
+
+Even if you don't want to replace your IDE with command-line tools, I hope you can find something interesting reading this guide.
 
 ## Compile from commandline on PC
 
@@ -388,7 +390,7 @@ If you never worked with ARM chips you've probably never heard of SWD (serial wi
 
 SWD is built on top of JTAG. So if a chip supports SWD, it also supports JTAG. SWD needs 2 data pins: `SWDIO` and `SWDCLK`. JTAG needs 4 data pins: `TMS`, `TCLK`, `TDO`, and `TDI`. In fact, some of their pins are compatible (`SWDIO == TMS`, `SWDCLK == TCLK`) and that why you may sometimes see connectors that can be used for both SWD and JTAG.
 
-![Source: https://wiki-power.com/en/SWD%E4%B8%8EJTAG%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8E%E8%81%94%E7%B3%BB/](./resource/JTAG_SWD_Connector.png)
+<img src="./resource/JTAG_SWD_Connector.png" alt="Source: https://wiki-power.com/en/SWD%E4%B8%8EJTAG%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8E%E8%81%94%E7%B3%BB/" height="200"/>
 
 For chips supporting both debug ports, they default to JTAG on a cold boot and switch to SWD by sending a 50 clock cycle reset high, a 16 bit command sequence, and another 50 clock cycle reset high.
 
@@ -414,7 +416,9 @@ Recall from the previous part on JTAG, we know JTAG can load programs into memor
 
  If we only want to load the program to the MCU (or, a loader), a JTAG chip (FTDI chip) and some software drivers on PC is all we need. However, when we look at a loader, it sometimes has more ICs than only a FTDI (JTAG) chip. What are these then?
 
-![Source: https://olimex.wordpress.com/2012/04/26/tms320-xds100-v3-prototypes-are-ready/](./resource/tms320-xds100-v3.jpg)
+<img src="./resource/tms320-xds100-v3.jpg" alt="Source: https://olimex.wordpress.com/2012/04/26/tms320-xds100-v3-prototypes-are-ready/" height="200"/><br>
+
+
 
 The picture above is a XDS100v3 loader/debugger for Texas Instruments TMS320  MCU series. The smaller chip in the white sqaure is a FTDI chip (FT2232H). What is this larger chip for? To add breakpoints for debugging.
 

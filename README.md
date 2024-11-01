@@ -2,16 +2,15 @@
 
 A Beginner's Guide on Embedded System Programing without IDE.
 
-[English Version Click Here (Not finished)](./Embedded_IDE_Lobotomy_EN.md)
+[English Version Click Here](./Embedded_IDE_Lobotomy_EN.md)
 
-### What's wrong with IDE?
+If you have ever spent some time programming an embedded system, you might agree that working with embedded IDEs is not a very pleasant experience. Code Composer Studio, Keil, STM32CubeIDE... they are clumsy and confusing as they hide everything under a GUI.
 
-If you have some experience with programming embedded system from an IDE like Code Composer Studio, Keil, or STM32CubeIDE, you might have experienced the same phase as I did:
+To get rid of embedded IDEs, I put many efforts to find out what is happening behind them. Today, I still can't say confidently that I've learnt everything about them, but I went through many interesting topics, interesting enough for me to **replace every part of an IDE with some open sourced command-line tools.**
 
-You want to start a new project, so you copy and paste the same IDE project template you've been using since day 1. You are not sure what keeps this template running but you know moving a single header file around will definitely cause compilation errors. The dependency management is a mess, and even if you want to import a new library you are not sure where to put it. If the IDE complains a header file is not found, the only fix you know is to change `#include "header.h"` to `#include "../inc/header.h"`, click on `Build`, and hope it would work.
+Then, I met some other people with the same interest, which gave me a reason to write down my findings. That's why I wrote this beginner's guide: **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**.
 
-I've been through the same phaes and today I still can't say confidently I've left this phase of ignorance. However, I did put many efforts to find out what is happening behind an embedded IDE. And that, is why I wrote this tutorial:
- **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**. To write down my findings and share them with others that have the same curiocity.
+Even if you don't want to replace your IDE with command-line tools, I hope you can find something interesting reading this guide.
 
 
 ### Target reader:
@@ -27,9 +26,11 @@ This guide is for you if you:
 - want to replace some parts of IDE with CLI tools
 - want to learn about how IDEs work
 
-I wish this guide can be understood by an electronics hobbist or a undergrad freshman, but I also don't want to re-explain topics with existing well-written tutorials. **So this guide will cite many external resources and they are also part of this guide.**
+**For some common topics with many existing excellent tutorials, I cite external resources as part of this guide. For best experience you might also want to read them.**
 
-### Wait...why would I want to do IDE Lobotomy?
+I hope this guide can be understood by an entry level person like a undergrad ECE freshman. Please tell me if something is poorly explained.
+
+### Why do I want to get an IDE Lobotomy?
 
 I got asked this question once during an interview so I made something up. Here's a list.
 
@@ -41,7 +42,7 @@ I got asked this question once during an interview so I made something up. Here'
 - Doesn't crash
 - Open Source
 
-I can't make up more, but I'm sure you know what you are doing if you read this far. Hope you have fun reading this guide because I know I did.
+I'm sure you know what you are doing if you read this far. Hope you have fun reading this guide because I know I did.
 
 > Removing IDE from you life is just like having Lobotomy: no more pain for your life without absolutely zero side effect!
 
@@ -62,12 +63,13 @@ I can't make up more, but I'm sure you know what you are doing if you read this 
 
 [中文版点此（未上线）]()
 
-### IDE怎么了？
-如果你有一些使用IDE，比如Code Composer Studio, Keil, 或者STM32CubeIDE，进行嵌入式编程的经验，你大概也会和我一样经历这样一个阶段：
+如果你有一些嵌入式编程的经历，你大概会同意使用IDE并不是一件特别愉快的事。Code Composer Studio, Keil, 或者STM32CubeIDE……他们很不灵活，也很难搞清楚GUI之下到底在发生些什么。
 
-你想开一个新项目，于是你复制粘贴了那个祖传IDE工程模板。你不太确定到底是什么东西让这个模板正常运转，但你知道乱动头文件一定会导致编译报错。依赖项管理非常糟糕，你想要导入一个新库也不确定该放哪。如果IDE告诉你头文件未找到，你也只敢把 `#include "header.h"`改成 `#include "../inc/header.h"`然后点击`Build`，希望这次一切正常。
+我花了很多精力去研究IDE的运行原理，试图绕过IDE。应该说，今天我依然不能自信自己已经完全搞明白了嵌入式IDE。不过，我学到了很多有趣的知识，有趣到可以让我**把整个IDE换成开源的命令行工具**。
 
-我也经历过这个无知的阶段，应该说，今天我依然不能自信自己已经完全离开了这种无知。不过，我确实做出了很多努力，去探索这些嵌入式IDE之下到底发生了什么。这也是我写这篇指南的初衷：**通过将每一步用命令行工具替换，向嵌入式工程师展示从源码到单片机上的程序，嵌入式IDE里面到底发生了什么**。写下我的这些发现，也希望可以分享给其他怀有同样好奇心的人们。
+很快，我遇到了抱有同样兴趣的其他人。于是我就有了一个去把我的发现写下来的理由，也是我写这篇指南的初衷：**通过将每一步用命令行工具替换，向嵌入式工程师展示从源码到单片机上的程序，嵌入式IDE里面到底发生了什么**。
+
+即便你不打算把IDE换成命令行工具，我也希望你能在这篇指南中找到一些有趣的东西。
 
 ### 目标读者：
 
@@ -81,11 +83,16 @@ I can't make up more, but I'm sure you know what you are doing if you read this 
 - 想用命令行工具替换一部分的 IDE
 - 想学习IDE是怎么工作的
 
-我希望这篇教程可以被电子爱好者和大一新生轻易读懂，但我同时又不愿意重新解释一些已经有非常优秀的其他教程的主题。**所以本指南会引用许多外链，这些外链也是本指南的一部分。**
+**对于一些已有许多优秀教程的主题，我在本指南中直接引用了他们的外链。为了最佳体验，请一并阅读他们**。
+
+> 本指南最早是英语写的，有些外链会是英文
+
+我希望这篇教程可以让真正的入门者，比如大一计算机/电子新生读懂。如果有东西解释的很糟糕，请告诉我。
+
 
 ### IDE切除术……我为啥要这么做？
 
-我在一次面试里面被问过这个问题所以我现编了点，好处如下：
+我在一次面试里面被问过这个问题所以我现编了点回答，好处如下：
 
 - 更灵活的文件结构
 - 更好的Git/Github兼容性
@@ -95,16 +102,16 @@ I can't make up more, but I'm sure you know what you are doing if you read this 
 - 不崩溃
 - 支持开源
 
-好我编不下去了，但是你都看到这里了我觉得你是知道自己在做什么的。希望你能在阅读本指南时获得和我探索时一样多的快乐。
+好我编不下去了，但是你都看到这里了我觉得你是知道自己在做什么的。希望你也能在阅读本指南时获得快乐。
 
 > 将 IDE 扔出你的生活就好像接受脑叶切除术：生活不再痛苦，并且没有任何副作用！
 
 ### 目录
 
 - 在电脑上从命令行编译
-- 单片机怎么控制外设（寄存器，内存映射，与库）
+- 单片机怎么控制外设（4层需要编译的库）
 - 如何编译大量的源文件（makefile 和 CMake）
 - 电脑为什么可以编译单片机（工具链和交叉编译）
-- 单片机怎么知道要运行什么（烧录和复位）
-- 调试又是什么原理（OpenOCD，GDB，SWD vs JTAG, 调试器，gdb server）
+- 烧录器/仿真器/调试器里面有什么
+- 调试是什么原理（OpenOCD，GDB，gdb server）
 - 实例分析：以`illini-robomaster`为例
