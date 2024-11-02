@@ -8,15 +8,15 @@ To get rid of embedded IDEs, I put many efforts to find out what is happening be
 
 Then, I met some other people with the same interest, which gave me a reason to write down my findings. That's why I wrote this beginner's guide: **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**.
 
-Even if you don't want to replace your IDE with command-line tools, I hope you can find something interesting reading this guide.
+Even if you don't want to replace your IDE with command-line tools, I hope you can have some fun reading this guide.
 
 ## Compile from commandline on PC
 
-Computers speak machine code of 0's and 1's and each CPU family speaks a little different machine code. The most common example of this is AMD CPU with ARM architecture vs Intel CPU with x86-64 architecture. If you copy a exe file working on one to the other, it's likely* that it would not work or run very slow (because Windows is doing a real-time translation job).
+Computers speak machine code of 0's and 1's and each CPU family speaks a little different machine code. The most common example of this is AMD CPU with ARM architecture vs Intel CPU with x86-64 architecture. If you copy a exe file from one to the other, it's likely* that this exe would not work or run very slow (because Windows is doing a real-time translation job).
 
 > *I didn't try it. Some guy on stackoverflow claims this is true.
 
-Writing program in machine code for every CPU ever built is impractical. So people decided to write program in a higher level language (C/C++). If each CPU can have their own translator from this higher level language to their machine code, a program can run on any CPU. This translator is called the "compiler".
+Writing programs in machine code for every CPU ever built is impractical. So people decided to write program in a higher level language (like C/C++). If each CPU can have their own translator from this higher level language to their machine code, a program written in these high level languages can run on any CPU. This translator is called the "compiler".
 
 > And the ability to run on different CPU families is called "cross platform". Like Python can run on ARM and x86 desktops.
 
@@ -24,11 +24,11 @@ Writing program in machine code for every CPU ever built is impractical. So peop
 
 `GCC (GNU Compiler Collection)` family is probably the most well-known C/C++ compiler**. To learn how to use `gcc` on a PC is our first step to understand embedded IDE.
 
-> **Actually, most "compilers" today are drivers that call compiler, assembler, or linker depending on the input file and command.
+> **Most "compilers" today are drivers that call compiler, assembler, or linker depending on the input file and command.
 
 Getting `gcc` on Linux is trivial. If you are on Windows, you can use a Linux virtual machine (I use `vmware player 17` + `Ubuntu 22.04`) or `MinGW-W64` + `Git Bash` (remember to add `mingw64/bin` to system PATH if you choose this way).
 
-UCLA has a good [one-page tutorial](https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html) on how to use gcc to compile C/C++ program:
+UCLA has a good [one-page tutorial](https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html) on how to use gcc to compile C/C++ program.
 
 #### .exe, .out, and .elf
 
@@ -42,7 +42,7 @@ On Windows, this will give you `a.exe`.
 
 On Linux, this will give you `a.out`.
 
-We said compilers translate C to CPU specific machine code. If we are compiling against the same CPU, that means these 2 executables are the same thing, right? ...right?
+We said compilers translate C to CPU specific machine code. If we are compiling against the same CPU, that means these 2 executables should contain the same machine code, right? ...right?
 
 **No.** Even though they contain the same* machine code, how the machine code is packaged into an executable is different.
 
@@ -56,12 +56,16 @@ When we try to run `a.out` on Windows, or `a.exe` on Linux, it doesn't work beca
 
 So what are this extra OS specific information? Instructions for the OS about how to handle this executable. For example, relocation information: executables can ask OS to put them in a specific** memory address when running.
 
-> **If multiple processes ask to locate at the same memory address, they will not collide because of virtual memory.
+> **If you are curious how do they avoid using the the same memory address, they don't. Virtual memory handled by the OS will make these exectuables believe they are in the right address.
 
 Okay but why do we care about these different executables and additional information for OS?
 
 Because when we load programs to embedded MCU without an OS, these OS instructions are not needed. We can't load `.exe` or `.elf` to MCUs. Instead, we load binary files `.hex` or `.bin`, where everything (code/data) has a fixed address to a fixed memory address based on CPU design with a external hardware loader. Program counter of the MCU returns to this fixed memory address and starts running every time we reset the MCU.
 
+For example, for the `STM32` MCU family, the address is usually `0x8000000`. We then load our binary program to this address with
+```bash
+st-flash --reset write output.bin 0x8000000
+```
 #### Mildly more advanced compiling
 
 Most "compilers" today are drivers that call compiler, assembler, and linker depending on the file input.
@@ -71,7 +75,21 @@ When we call:
 gcc main.c
 ```
 
-It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking. There are many excellent tutorials on this topic. I would not redo their work. I found this lecture slide from University of North Carolina at Charlotte, [Introduction to Computer Architecture](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf) very helpful:
+It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking.
+
+I should admit I'm not very familiar with compiling so I might do a bad job explaining it. So here is a [lecture slide](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf) from University of North Carolina at Charlotte, Introduction to Computer Architecture and I found it very helpful.
+
+If you can understand
+- what the following commands are doing
+- why do we want to write our program in multiple source files
+
+you should have no problem reading the following chapters!
+
+```bash
+gcc -c main.c -o main.o
+gcc -c library.c -o library.o
+gcc library.o main.o -o output
+```
 
 
 ## How to control peripherals on MCU (4 layers of libraries we need to compile)
@@ -88,7 +106,7 @@ Let's start with an overview of all 4 layers of libraries of an embedded project
 
 At the very bottom is the **register level control**. All actions of a MCU is controlled by changing values of some registers. For example, to change the behavior of a GPIO between input mode and output mode, we need to change the control register of input/output multiplexer.
 
-The code for register level control usually look like this:
+Code for register level control usually look like this:
 
 ```C
 Blink an LED on MCU STC89C52
@@ -109,9 +127,11 @@ int main() {
 }
 ```
 
+Usually you don't need to worry about this level, unless you are write some very low-level driver, FPGA, or you built a hardware.
+
 #### MCU library (manufacturer library)
 
-On top of register layer is what I called the "manufacturer library". When we program at the register level, you always need to know the **memory address** of a register to control it, which is tedious. So many MCU manufacturers write their library and you, the user, don't need to care about these registers. For example, `HAL` for `stm32` family, `Driverlib` for `TI C2000` family.
+On top of register layer is what I called the "manufacturer library". When we program at the register level, you always need to know the **memory address** of a register to control it and that is tedious. So many MCU manufacturers write their library and you, the user, don't need to care about these registers. For example, `HAL` for `stm32` family, `Driverlib` for `TI C2000` family.
 
 The code for MCU library level usually look like this:
 ```C
@@ -126,13 +146,15 @@ while (1)
 ...
 ```
 
-Another benefit is many MCUs from the same family can use the same manufacturer library API. Now we are using `STM32F1`. If we want to switch to its close relative `STM32F4`, we can use the same piece of user code to blink LED on our new MCU.
+Another benefit of having a manufacturer library is that many MCUs from the same family share the same manufacturer library API. The example code above uses `STM32F1` and if we want to switch to its close relative `STM32F4`, we can use the same piece of user code to blink LED on our new MCU because the API for these 2 MCUs are the same.
 
 #### Non-bsp library (high level library)
 
 The entire point of bsp library is to make higher level library cross platform, so let's skip the bsp library for now and look at what non-bsp library is trying to do. The high level library's API depends on what embedded system you (the user) want to build. If designed properly, controlling your system with your high level library should be very convenient.
 
-Suppose we want to build an LED array to display numbers and use PWM to control brightness. Sounds very complicated, but with properly designed high level library, our final user code using the high level library might look as simple as this:
+For example, you are writing firmware for a fridge. Then `SetTemperature()` might be a very helpful function in your high level library. There is no way this function could be part of the manufacturer library because not everyone is using the MCU to build fridges and `SetTemperature()` is a useless function for them.
+
+Suppose we want to build an LED array to display numbers (like a digital clock) and use PWM to control brightness. With properly designed high level library, our final user code using the high level library might look as simple as this:
 
 ```C
 Display 4 on an LED array
@@ -214,7 +236,7 @@ build/main.elf: hello.c main.c
     gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
 
-`build/main.elf` is the **target** (which is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command if the target doesn't exist.
+`build/main.elf` is the **target** (which is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command **only** if the target doesn't exist.
 
 `hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. If we have a dependency tree, only building necessary files will save a lot of time.
 
@@ -231,7 +253,7 @@ clean:
 
 If we run `make clean`, `makefile` will look for a file called `clean` in the current directory. Since there is no such file, the command will run and all `.out` and `.elf` files will be removed in the current directory.
 
-> If there is such a file called `clean`, please refer to the makefile keyword: `.PHONY`
+> If there is such a file called `clean`, search this: `.PHONY`
 
 #### CMake
 
@@ -273,13 +295,13 @@ add_custom_target(flash-${name}
     DEPENDS ${name}.elf)
 ```
 
-Now every time we run `make flash-<your binary name>` like `make flash-led`, the corresponding binary, in this case, `led.elf` will be loaded to your MCU with `st-flash`, a binary loader for `STM32` MCU family.
+`st-flash` is a binary loader for `STM32` MCU family. Now every time we run `make flash-<your binary name>` like `make flash-led`, `st-flash` will load `led.elf` to our MCU.
 
 That's it. All about targets. That's core idea about CMake. No matter how many variables you defined or how many `execute_process()` you added, if there is no target to be generated, none of the CMake commands will be executed. **No matter how complex or scary the CMake structure looks, find out what targets this CMake is building and everything will be simple and clear.**
 
 With that in mind you should be able to understand most of the CMake tutorials available.
 
-> CMake is a very deep rabbit hole and how deep you decide to go in is up to you. I've warned you.
+> CMake is a very deep rabbit hole, which is also the reason I want to minimize the amount of content in this chapter. How deep you decide to dig down is up to you. Good luck and have fun.
 
 ## Why PC can compile against MCU (Cross-compile and Toolchain)
 
@@ -294,7 +316,7 @@ Recall the very beginning of our **chapter 1: compile from commandline on PC**, 
 1. Different MCU/CPUs speak different machine code
 2. Executable for one platform (CPU + OS) cannot run on another platform.
 
-These are the two primary reasons for having compilers, to translate source code into corresponding machine code. Wait! When we compile for a embedded system on PCs, how can the program run on the embedded MCU even if it is compiled on a PC? The answer is what we called **cross-compile**.
+Wait! When we compile for a embedded system on our computers, how can the program run on the embedded MCU even if it is compiled on a PC? The answer is what we called **cross-compile**.
 
 Let's examine the difference between **compile** and **cross-compile**:
 
@@ -310,12 +332,20 @@ For a source file `.c`, if we want to run it on our PC, we compile it with `gcc`
 
 Suppose our PC is x86-64 Ubuntu and our MCU is ARM architecture STM32F4. This is a **bare-metal target**, which means it doesn't have any operating systems on it. So the cross-compiling toolchain we get is `x86_64 Linux hosted cross toolchains AArch32 bare-metal target (arm-none-eabi)` and our cross-compiler is `arm-none-eabi-gcc`.
 
-To use these in our `CMake` script, add the following commands:
+We can call it just like `gcc`:
+
+```bash
+arm-none-eabi-gcc main.c -o main
+```
+
+But it won't do much things. Remember we need all those 4 layers libraries? We need to use `CMake` sooner or later. To use these in our `CMake` script, add the following commands:
 
 ```cmake
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 ```
+
+These commands change the default compiler for `CMake` from `gcc` to `arm-none-eabi-gcc` and the generated commands will compile with `arm-none-eabi-gcc`.
 
 The compiled result from arm toolchain compiler is a `.elf` file we discussed in the first chapter.
 
@@ -356,7 +386,7 @@ There are many names for them.
 - Debug probe
 - Emulator
 
-We will explain why each name makes sense very soon in this chapter, but let's first look at how they connect to our hardware.
+We will explain why each name makes sense later in this chapter. Let's first look at how they connect to our hardware.
 
 On the PC side, the connector is usually a USB. On the embedded side, depending on the chip manufacturer, we can have many choices.
 
@@ -390,7 +420,7 @@ If you never worked with ARM chips you've probably never heard of SWD (serial wi
 
 SWD is built on top of JTAG. So if a chip supports SWD, it also supports JTAG. SWD needs 2 data pins: `SWDIO` and `SWDCLK`. JTAG needs 4 data pins: `TMS`, `TCLK`, `TDO`, and `TDI`. In fact, some of their pins are compatible (`SWDIO == TMS`, `SWDCLK == TCLK`) and that why you may sometimes see connectors that can be used for both SWD and JTAG.
 
-<img src="./resource/JTAG_SWD_Connector.png" alt="Source: https://wiki-power.com/en/SWD%E4%B8%8EJTAG%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8E%E8%81%94%E7%B3%BB/" height="200"/>
+<img src="./resource/JTAG_SWD_Connector.png" alt="Source: https://wiki-power.com/en/SWD%E4%B8%8EJTAG%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8E%E8%81%94%E7%B3%BB/" height="200"/><br>
 
 For chips supporting both debug ports, they default to JTAG on a cold boot and switch to SWD by sending a 50 clock cycle reset high, a 16 bit command sequence, and another 50 clock cycle reset high.
 
