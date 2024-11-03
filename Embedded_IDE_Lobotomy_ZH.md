@@ -1,95 +1,97 @@
-# Embedded IDE Lobotomy
+# 嵌入式IDE前额叶切除术
 
 2024.10
 
-If you have ever spent some time programming an embedded system, you might agree that working with embedded IDEs is not a very pleasant experience. Code Composer Studio, Keil, STM32CubeIDE... they are clumsy and confusing as they hide everything under a GUI.
+如果你有一些嵌入式编程的经历，你大概会同意使用IDE并不是一件特别愉快的事。Code Composer Studio, Keil, 或者STM32CubeIDE……他们很不灵活，也很难搞清楚GUI之下到底在发生些什么。
 
-To get rid of embedded IDEs, I put many efforts to find out what is happening behind them. Today, I still can't say confidently that I've learnt everything about them, but I went through many interesting topics, interesting enough for me to **replace every part of an IDE with some open sourced command-line tools.**
+我花了很多精力去研究IDE的运行原理，试图绕过IDE。应该说，今天我依然不能自信自己已经完全搞明白了嵌入式IDE。不过，我学到了很多有趣的知识，有趣到可以让我做到**把整个IDE换成开源的命令行工具**。
 
-Then, I met some other people with the same interest, which gave me a reason to write down my findings. That's why I wrote this beginner's guide: **To show Embedded Engineers what is happening behind an Embedded IDE, from source code to a running program on MCU, by replacing every step with Command-line tools**.
+之后，我遇到了一些抱有同样兴趣的人，我于是就有了一个去把我的发现写下来的理由。这也是我写这篇指南的初衷：**通过将每一步用命令行工具替换，向嵌入式工程师展示从源码到单片机上的程序，嵌入式IDE里面到底发生了什么**。
 
-Even if you don't want to replace your IDE with command-line tools, I hope you can have some fun reading this guide.
+即便你不打算把IDE换成命令行工具，我也希望你能在这篇指南中找到一些有趣的东西。
 
-## Compile from commandline on PC
+## 在电脑上从命令行编译
 
-Computers speak machine code of 0's and 1's and each CPU family speaks a little different machine code. The most common example of this is AMD CPU with ARM architecture vs Intel CPU with x86-64 architecture. If you copy a exe file from one to the other, it's likely* that this exe would not work or run very slow (because Windows is doing a real-time translation job).
+电脑使用由0和1组成的机器码，每个CPU家族又使用一种彼此之间略有不同的机器码。最常见的例子大概是AMD的ARM架构和intel的x86-64架构了。我们把一份exe文件从一个其中一个拷贝到另一个的时候，很可能*这个exe要么没法运行，要么运行得十分缓慢（因为Windows在实时翻译）。
 
-> *I didn't try it. Some guy on stackoverflow claims this is true.
+>我没真的试过，StackOverflow上有人说这是真的。
 
-Writing programs in machine code for every CPU ever built is impractical. So people decided to write program in a higher level language (like C/C++). If each CPU can have their own translator from this higher level language to their machine code, a program written in these high level languages can run on any CPU. This translator is called the "compiler".
+用机器码写程序为世界上每一个CPU写程序是不现实的。所以人们决定用一些高级语言（比如C/C++）写程序。如果每个CPU都能提供一个翻译器，把高级语言翻译成自己的机器码，那么我们用高级语言写的程序就可以在任意的CPU上运行了。这个翻译器就是“编译器”。
 
-> And the ability to run on different CPU families is called "cross platform". Like Python can run on ARM and x86 desktops.
+> 这种能够在不同的CPU系列上运行的能力被称为“跨平台”。比如Python可以在ARM和x86的电脑上运行。
 
 #### GCC
 
-`GCC (GNU Compiler Collection)` family is probably the most well-known C/C++ compiler**. To learn how to use `gcc` on a PC is our first step to understand embedded IDE.
+`GCC (GNU Compiler Collection)` 家族大概是最知名的C/C++编译器**。学习如何在电脑上使用`gcc`是我们理解嵌入式IDE的第一步。
 
-> **Most "compilers" today are drivers that call compiler, assembler, or linker depending on the input file and command.
+> **今天的，大多数编译器其实是一个引导程序，根据输入文件和命令调用编译器，汇编器（assembler），或者链接器。
 
-Getting `gcc` on Linux is trivial. If you are on Windows, you can use a Linux virtual machine (I use `vmware player 17` + `Ubuntu 22.04`) or `MinGW-W64` + `Git Bash` (remember to add `mingw64/bin` to system PATH if you choose this way).
+在Linux上安装`gcc`应该是很简单的。如果你使用的是Windows，你可以装一个Linux虚拟机（我用的是`vmware player 17` 和 `Ubuntu 22.04`）或者`MinGW-W64` + `Git Bash`（如果你选择了这种方法，记得把`mingw64/bin`加进PATH）
 
-UCLA has a good [one-page tutorial](https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html) on how to use gcc to compile C/C++ program.
+UCLA关于如何用gcc编译C/C++有一个不错的[一页纸的教程](https://web.cs.ucla.edu/classes/fall14/cs143/project/cpp/gcc-intro.html)
+
 
 #### .exe, .out, and .elf
 
-Let's take a look at what we have for gcc compilers.
+让我们看看gcc编译器输出了什么：
 
 ```bash
 gcc main.c
 ```
 
-On Windows, this will give you `a.exe`.
+在Windows上，这会生成`a.exe`
 
-On Linux, this will give you `a.out`.
+在Linux上，这会生成`a.out`
 
-We said compilers translate C to CPU specific machine code. If we are compiling against the same CPU, that means these 2 executables should contain the same machine code, right? ...right?
+我们说过编译器把C翻译成每个CPU特有的机器码。如果我们是面向同一个CPU编译的，那么产生的两个可执行文件也应该有相同的机器码。对……对吗？
 
-**No.** Even though they contain the same* machine code, how the machine code is packaged into an executable is different.
+**不尽然**。即使这两个可执行文件有着相同*的机器码，这些机器码被装载在可执行文件中的方式也是有所不同的。
 
-> *Not entirely the same if we use external libraries or system calls.
+>*如果我们用了外界的库或者系统调用，机器码也会不相同
 
-When we try to run `a.out` on Windows, or `a.exe` on Linux, it doesn't work because these exectuables contain operating system specific information besides machine code.
+当我们试图在Windows上运行`a.out`或者在Linux上运行`a.exe`，他们并不能运行。因为这些可执行文件除了机器码还装有给操作系统看的一些信息。
 
-`.exe (Executable)` file is a Microsoft OS specific executable format, while `.out` file is a Unix/Linux specific executable format called `Executable and Linkable Format (.elf)`.
+`.exe (Executable)` 文件是一种微软操作系统特有的格式；`.out`文件则是一种被称为`Executable and Linkable Format (.elf)` 的Unix/Linux特有的文件格式
 
-> `.elf` and `.out` files are the same thing with different names. It's called `a.out` for only historical reasons.
+> `.elf` 和 `.out` 是同一个东西的两种名字。`a.out` 这个名字纯粹是历史遗留问题。
 
-So what are this extra OS specific information? Instructions for the OS about how to handle this executable. For example, relocation information: executables can ask OS to put them in a specific** memory address when running.
+那么这些给操作系统看的信息是什么呢？是关于操作系统应该如何处理这个可执行文件的指令。比如说，重定位(relocation)信息：可执行文件可以让操作系统把他们放到一个指定**的内存地址来运行。
 
-> **If you are curious how do executables avoid using the the same memory address, they don't. Virtual memory handled by the OS will make these exectuables believe they are in the right address.
+>**如果你好奇可执行文件之间是如何避免使用相同的内存地址，答案是他们不避免。由操作系统管理的虚拟内存会让所有人都以为自己在自己指定的内存地址上。
 
-Okay but why do we care about these different executables and additional information for OS?
+好，但是我为什么要关心这些不同的可执行文件和给OS看的额外信息呢？
 
-Because when we load programs to embedded MCU without an OS, these OS instructions are not needed. We can't load `.exe` or `.elf` to MCUs. Instead, we load binary files `.hex` or `.bin`, where everything (code/data) has a fixed memory address. We load the binary file to the MCU starting from an fixed memory address (based on CPU design). Program counter of the MCU returns to this fixed memory address and starts running every time we reset the MCU.
+因为当我们将程序烧录到没有操作系统的单片机中时，这些给操作系统看的额外信息是不需要的。我们无法烧录`.exe`或者`.elf`到单片机上，只能烧录二进制文件`.bin`或者`.hex`。这些二进制文件中，所有的东西（代码和数据）都有固定的地址。我们把这个二进制文件烧录到单片机中一个固定的地址（具体地址取决于CPU设计）。单片机的程序计数器（Program counter）每次重置的时候都会从此地址开始执行代码。
 
-For example, for the `STM32` MCU family, the address is usually `0x8000000`. We then load our binary program to this address with
+比如说，对于`STM32`单片机家族，地址通常是`0x8000000`。我们因此将二进制文件烧录到该地址：
 ```bash
 st-flash --reset write output.bin 0x8000000
 ```
-#### Mildly more advanced compiling
+#### 编译之略微进阶
 
-Most "compilers" today are drivers that call compiler, assembler, and linker depending on the file input.
+现如今的大多数编译器其实是引导程序，会根据输入文件的类型调用编译器，汇编程序，和链接器。
 
-When we call:
+当我们运行：
 ```bash
 gcc main.c
 ```
 
-It takes 4 steps to convert this source file into an executable: preprocessing, compiling, assembling, and linking.
+这个源文件在变成可执行文件中经历了四个步骤：预处理，编译，汇编，和链接。
 
-I should admit I'm not very familiar with compiling so I might do a bad job explaining it. So here is a [lecture slide](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf) from University of North Carolina at Charlotte, Introduction to Computer Architecture and I found it very helpful.
+应该承认我对编译并不是特别熟悉，因此如果要我自己写这一段，我大概会写得很烂。所以这里是University of North Carolina at Charlotte计算机架构导论[其中一节课的讲义](https://passlab.github.io/ITSC3181/notes/lecture02_CompilationAssemblingLinkingProgramExecution.pdf). 我觉得这个对我理解汇编的细节帮助很大。
 
-If you can understand
-- what the following commands are doing
-- why do we want to write our program in multiple source files
+如果你能理解：
+- 下面这些命令是在做什么
+- 为什么我们会想把程序写成多个源文件
 
-you should have no problem reading the following chapters!
+那么你阅读随后的章节应该问题不大！
 
 ```bash
 gcc -c main.c -o main.o
 gcc -c library.c -o library.o
 gcc library.o main.o -o output
 ```
+
 
 
 ## How to control peripherals on MCU (4 layers of libraries we need to compile)
