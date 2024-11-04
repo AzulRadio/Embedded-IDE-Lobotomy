@@ -92,27 +92,25 @@ gcc -c library.c -o library.o
 gcc library.o main.o -o output
 ```
 
+## 如何控制单片机上的外设（需要编译的4层库）
 
+嵌入式IDE的工程文件夹里面总是有许多，许多的文件。但是我们为什么需要这么多呢？在这一章我们来看看嵌入式库的层级结构
 
-## How to control peripherals on MCU (4 layers of libraries we need to compile)
+我们从对嵌入式库的四层结构的一个总览开始：四层分别是：**寄存器控制**和**单片机库（制造商库）**由芯片的制造者提供，**bsp库（板载库）**和**非板载库（高级功能库）**是用户（你）写的。
 
-There are always many, many library source files in a embedded IDE project folder, but why do we need this many? In this chapter we will introduce the hierarchy of library for embedded system.
-
-Let's start with an overview of all 4 layers of libraries of an embedded project. There are 4 layers: **Register level control** and **MCU library (manufacturer library)** are provided by the chip manufacturer; **bsp library** and **non-bsp library (higher level library)** are written by the user (you).
-
-> Disclaimer: This is only the way I use to structure the project and by no means is a universal standard.
+> 免责声明：这只是我整理工程的方法，不是一个标准方法。
 
 ![](./resource/bsp_vs_non_bsp.png)
 
-#### Register level control
+#### 寄存器级别的控制
 
-At the very bottom is the **register level control**. All actions of a MCU is controlled by changing values of some registers. For example, to change the behavior of a GPIO between input mode and output mode, we need to change the control register of input/output multiplexer.
+最下面的 **register level control** 是寄存器级别控制。所有单片机的行动都是由改变一些寄存器中的值控制的。比如说，想改变GPIO的输入，输出模式，我们就需要改变寄存器输入输出MUX的控制寄存器值。
 
-Code for register level control usually look like this:
+寄存器级别的控制通常看起来如下：
 
 ```C
-Blink an LED on MCU STC89C52
-sfr and sbit are special data type defined for these MCUs
+MCU STC89C52 的闪烁LED
+sfr和sbit是这种MCU的特殊数据类型
 
 /*  BYTE Registers  */
 sfr P0    = 0x80;
@@ -129,15 +127,16 @@ int main() {
 }
 ```
 
-Usually you don't need to worry about this level, unless you are write some very low-level driver, FPGA, or you built a hardware.
+通常你不需要关心这一层，除非你在写一些非常低级别的驱动，写FPGA，或者自己做了一个硬件。
 
-#### MCU library (manufacturer library)
+#### 单片机库（制造商库）
 
-On top of register layer is what I called the "manufacturer library". When we program at the register level, you always need to know the **memory address** of a register to control it and that is tedious. So many MCU manufacturers write their library and you, the user, don't need to care about these registers. For example, `HAL` for `stm32` family, `Driverlib` for `TI C2000` family.
+寄存器层之上是一层我称之为“单片机库”(MCU library)的东西。当我们在寄存器层写程序时，我们需要知道所有寄存器的**内存地址**去控制他们。这相当的麻烦。所以许多单片机制造商写了自己的库，这样你，作为用户，就不需要关心寄存器层了。`stm32`家族的`HAL`，`TI 2000`家族的`DriverLib`都属于此类。
 
-The code for MCU library level usually look like this:
+单片机库的代码往往看起来如下：
+
 ```C
-Blink an LED on MCU STM32F1
+在单片机STM32F1上闪烁LED
 ...
 while (1)
 {
@@ -148,118 +147,121 @@ while (1)
 ...
 ```
 
-Another benefit of having a manufacturer library is that many MCUs from the same family share the same manufacturer library API. The example code above uses `STM32F1` and if we want to switch to its close relative `STM32F4`, we can use the same piece of user code to blink LED on our new MCU because the API for these 2 MCUs are the same.
+使用制造商库的另一个好处是许多属于同一家族的MCU会共享一个相同的制造商库API。上面这个例程使用的是`STM32F1`，如果我们希望换成它的近亲`STM32F4`，我们可以使用完全相同的程序来实现功能，因为这两个单片机的API是相同的。
 
-#### Non-bsp library (high level library)
+#### 非板载库（高级库）
 
-The entire point of bsp library is to make higher level library cross platform, so let's skip the bsp library for now and look at what non-bsp library is trying to do. The high level library's API depends on what embedded system you (the user) want to build. If designed properly, controlling your system with your high level library should be very convenient.
+整个板载库（bsp库）的存在意义就是让高级库可以跨平台，所以我们现在先跳过 bsp 库，看看非 bsp 库（高级库）试图做什么。高级库的 API 取决于你（用户）想要构建的嵌入式系统的目的。如果设计得当，使用高级库控制你的嵌入式系统应该是非常方便的。
 
-For example, you are writing firmware for a fridge. Then `SetTemperature()` might be a very helpful function in your high level library. There is no way this function could be part of the manufacturer library because not everyone is using the MCU to build fridges and `SetTemperature()` is a useless function for them.
+比如说为冰箱编写固件， `SetTemperature()` 可能就是高级库中非常有用的函数。这个函数不可能是单片机库（MCU library）的一部分，因为不是每个用户都使用这个单片机来制造冰箱，对他们来说在单片机库里的 `SetTemperature()` 就是一个无用的函数。
 
-Suppose we want to build an LED array to display numbers (like a digital clock) and use PWM to control brightness. With properly designed high level library, our final user code using the high level library might look as simple as this:
+假设我们想要写一个 LED 阵列来显示数字（像数字时钟一样）并使用 PWM 来控制亮度。使用设计得当的高级库，我们使用高级库的最终用户代码可以非常简单：
 
 ```C
-Display 4 on an LED array
+在LED阵列上显示数字4
 
 led_array_t led_array = {some initialization here};
 int main() {
   while (1) {
     DisplayNumber(led_array, 4);
-    SetBrightness(led_array, 0.5); // Set brightness to 50%
+    SetBrightness(led_array, 0.5); // 设置亮度为 50%
   }
 }
 ```
-#### bsp library
+#### bsp库
 
-Now we return to the bsp library. The bsp library is the bridge layer between MCU library and high level library. We define a common API between higher level library and bsp library. Then implement this common API with MCU library.
+现在我们回到bsp库。bsp库是单片机库和高级库之间的桥梁层。我们在高级库和bsp库之间定义一个通用API，然后用单片机库实现这个通用API。
 
-For example, if we want to implement the `SetBrightness()` function in the example above, with `stm32`'s `HAL` library, the implementation might be like this:
+例如，如果我们想用`stm32`的`HAL`库实现上面例子中的`SetBrightness()`函数，实现方式可能是这样的：
+
+
 ```C
-in led_array.c, high level library
+in led_array.c, 高级库
 void SetBrightness(led_array_t *dev, float input) {
   SetPWM(dev, input);
 }
 
-in bsp_pwm.c, bsp library
-// I didn't test this
+in bsp_pwm.c, bsp 库
+// 我没测试过这个
 void SetPWM(led_array_t *dev, float input) {
   uint32_t compare = input * dev->TIME_PERIOD;
   __HAL_TIM_SET_COMPARE(dev->htim, dev->channel, compare);
 }
 ```
 
-With `TI C2000`'s `Driverlib`, the implementation might be like this:
+使用`TI C2000`的`Driverlib`，实现可能是这样的：
+
 ```C
-in led_array.c, high level library
+in led_array.c, 高级库
 void SetBrightness(led_array_t *dev, float input) {
   SetPWM(dev, input);
 }
 
-in bsp_pwm.c, bsp library
-// I didn't test this
+in bsp_pwm.c, bsp 库
+// 我没测试过这个
 void SetPWM(led_array_t *dev, float input) {
   uint32_t compare = input * dev->TIME_PERIOD;
   EPWM_setCounterCompareValue(dev->pwm_base, dev->compare_id, compare);
 }
 ```
 
-Since we defined the common API `SetPWM()`, The implementation of high level library gets to stay the same across different MCUs. This is what we meant by cross-platform. **If we change to a slightly different MCU or the MCU library changes, the common API between bsp library and high level library allow us to only change bsp library implementation, instead of all the final user code or high level libraries.**
+由于我们定义了通用 API `SetPWM()`，高级库的实现在不同的单片机上可以保持不变。这就是我们所说的跨平台。**如果我们更改为略有不同的单片机或单片机库发生变化，bsp 库和高级库之间的通用 API 允许我们只更改 bsp 库实现，而不是所有最终用户代码或高级库。**
 
-## How to compile lots of source files (makefile and CMake)
+## 如何编译大量源文件（makefile 和 CMake）
 
-With all the libraries we introduced in the last chapter, there will be numerous source files in the project and their number will keep increasing. We can't do this the same way as chapter 1 and we need an automatic way to manage these compilation. So, we introduce `makefile` and `CMake`.
+上一章我们介​​绍了所有的库，一个工程中会有大量源文件，而且数量会不断增加。我们不能像第一章那样手动编译所有的源文件，我们需要一种自动化的方法来管理这些编译。所以， `makefile` 和 `CMake`。
 
-There are many makefile and CMake tutorials but I feel many of them failed to stress on the core idea of **target**. So I'm writing another one as a supplementary to those tutorials. You might want to read this chapter before looking at the other CMake/makefile tutorials.
+我觉得很多 makefile 和 CMake 教程缺乏的一点，是他们没有强调 **target** 的核心思想。所以我写了一点东西，作为对这些教程的补充。本章可以作为一个在阅读其他 CMake/makefile 教程之前的导读。
 
-Suppose we have 2 source files, `hello.c` and `main.c`. We want to compile these 2 source files into an executable. From the first chapter **compiling from commandline** we know how to do this with `gcc`:
+假设我们有 2 个源文件，`hello.c` 和 `main.c`。我们想将这两个源文件编译成一个可执行文件。从第一章**从命令行编译**中，我们知道如何使用 `gcc` 来执行这个操作：
 
 ```bash
 gcc hello.c main.c
 ```
 
-If we want the output executable to have name `main.elf`, put it in folder `build/` specify that we are using `C11` standard, and add a hidden `#define DEBUG` macro to enable some debug setting in the source code, the command would be:
+如果我们希望输出可执行文件的名称是 `main.elf`，将其放在文件夹 `build/` 中，再指定使用 `C11` 标准，并添加隐藏的 `#define DEBUG` 宏以在源代码中启用某些调试设置，这个命令会变成：
 
 ```bash
 gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
 
-As there are more parameters we would like to add, the command grows longer. **Makefile** is a script language that allows us not to type the long command every time. Now we only need to type:
+随着我们想要添加的参数越来越多，命令会变得越来越长。**Makefile** 是一种脚本语言，它允许我们不必每次都输入长命令。现在我们只需要输入：
 
 ```bash
 make build/main.elf
 ```
 
-> To do this with MinGW on Windows, you need to rename `mingw32-make.exe` to `make.exe`
+> 想在 Windows 上用 MinGW 这样做需要把 `mingw32-make.exe` 重命名为 `make.exe`
 
-`make` will look for a file called `makefile` in the directory it is called and execute the commands in it. Let's look at what `makefile` have in our example:
+`make` 将在调用它的目录中寻找一个叫 `makefile` 的文件，并执行其中的命令。让我们看看例子里面的这个 `makefile` 文件写了什么：
 
 ```makefile
 build/main.elf: hello.c main.c
     gcc hello.c main.c -o build/main.elf -std=c11 -DDEBUG
 ```
 
-`build/main.elf` is the **target** (which is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command **only** if the target doesn't exist.
+`build/main.elf` 是 **target（目标）**（这是 makefile 和 CMake 最重要的概念）。对于 makefile 脚本中的每个目标，`make` 将检查它是否存在，并且**仅**在目标不存在时执行命令。
 
-`hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. If we have a dependency tree, only building necessary files will save a lot of time.
+`hello.c` 和 `main.c` 是 **依赖项**。如果这些文件自上次构建以来发生了更改，`make` 也会执行该命令。`make`记录着依赖的关系树，并只重新编译必要的文件来节省编译的时间。
 
-Command is just command. Notice it has to be a `tab` before the command and cannot be `whitespace`.
+`gcc ……`就只是命令。请注意，命令前必须是一个 `tab`，不能是 `空格`。
 
-Now we know the 2 conditions for a command to run: **target doesn't exist or dependencies are changed**. We can write some interesting makefile scripts.
+现在我们知道了命令运行的两个条件：**目标不存在或依赖关系已更改**。我们可以编写一些有趣的 makefile 脚本。
 
-If the target is not created by the command, then this command will run every time we `make` because the target is always missing. For example:
+如果一个命令没有创建对应的目标，那么每次我们 `make` 时都会运行此命令，因为目标始终缺失。例如：
 
 ```makefile
 clean:
     rm *.out *.elf
 ```
 
-If we run `make clean`, `makefile` will look for a file called `clean` in the current directory. Since there is no such file, the command will run and all `.out` and `.elf` files will be removed in the current directory.
+如果我们运行 `make clean`，`makefile` 将在当前目录中查找名为 `clean` 的文件。由于没有这样的文件，命令将运行，当前目录中的所有 `.out` 和 `.elf` 文件都将被删除。
 
-> If there is such a file called `clean`, search this: `.PHONY`
+> 如果真的有一个名为 `clean` 的文件，搜索关键词：`.PHONY`
 
 #### CMake
 
-CMake is when our makefile is so long that we need to write another script to generate the makefile script. While `makefile` looks for a file named `makefile` in the current directory, `CMake` looks for a file named `CMakeLists.txt`. The most common use case is:
+CMake 是我们的 makefile 太长，以至于我们需要编写另一个脚本来生成 makefile 脚本的“另一个脚本”。就像`makefile` 在当前目录中查找名为 `makefile` 的文件一样，`CMake` 会查找名为 `CMakeLists.txt` 的文件。最常见的用例是：
 
 ```bash
 mkdir build
@@ -268,28 +270,27 @@ cmake ..
 make <your target name>
 ```
 
+许多关于 CMake 的教程过于关注使用细节，在我看来，这让它们变得冗长和难懂。当你阅读这些教程时，只要记住一件事：**（像 makefile 一样），CMake 只关心目标（target）**。
 
-Many tutorials on CMake focus too much on usage details which, in my opinion, makes them confusing and wordy. When you read these tutorials, keep in mind one thing: **(like makefile), CMake is all about targets**.
+回想一下， makefile 的一切都是关于目标的，makefile 中的每一行都是关于生成一个目标的。CMake 生成 makefile，所以 **如果未定义目标，那么这个 CMake 不会做任何事。**
 
-Remember makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles. **If no targets are defined, no action will be taken by this CMake.**
+**CMake 中只有 3 个函数会创建目标**：
 
-**There are only 3 functions that defines targets in CMake**:
-
-```Python
-# Executables that you can generate with GCC or GCC-like compilers
+```cmake
+# 可以使用 GCC 或类似 GCC 的编译器生成的可执行文件
 add_executable()
 
-# Libraries (.a/.so files) that you can generate with GCC or GCC-like compilers
+# 可以使用 GCC 或类似 GCC 的编译器生成的库 (.a/.so 文件)
 add_library()
 
-# Something that generated from other commandline tools
-# Example: python script that generate files
-# ...Or nothing, remember make clean?
-# We can use this to load programs to MCUs
+# 从其他命令行工具生成的内容
+# 比如说，生成文件的 python 脚本
+# ...或者什么都没有，还记得 make clean 吗？
+# 我们可以使用这个将程序烧录到单片机
 add_custom_target()
 ```
 
-The first two functions `add_executable()` and `add_library()` will detect if the target is created and if the dependencies are changed as `makefile` does. The third function `add_custom_target()`, however, will execute no matter what. Thus a little trick with `add_custom_target()` is to use it with loader binary like:
+前两个函数 `add_executable()` 和 `add_library()` 将检测目标是否已创建以及依赖项是否被更改，就和 `makefile` 一样。但是，第三个函数 `add_custom_target()` 无论如何都会执行。因此，`add_custom_target()` 的一个小技巧是将其与二进制文件烧录一起使用，例如：
 
 ```c
 add_custom_target(flash-${name}
@@ -297,81 +298,82 @@ add_custom_target(flash-${name}
     DEPENDS ${name}.elf)
 ```
 
-`st-flash` is a binary loader for `STM32` MCU family. Now every time we run `make flash-<your binary name>` like `make flash-led`, `st-flash` will load `led.elf` to our MCU.
+`st-flash` 是 `STM32` MCU 系列的烧录引导程序。现在，每次我们运行 `make flash-<your binary name>` （例如 `make flash-led`）时，`st-flash` 都会将 `led.elf` 烧录到我们的单片机中。
 
-That's it. All about targets. That's core idea about CMake. No matter how many variables you defined or how many `execute_process()` you added, if there is no target to be generated, none of the CMake commands will be executed. **No matter how complex or scary the CMake structure looks, find out what targets this CMake is building and everything will be simple and clear.**
 
-With that in mind you should be able to understand most of the CMake tutorials available.
+就是这样，所有的一切都是关于目标的，这就是 CMake 的核心思想。无论定义了多少变量添加了多少 `execute_process()`，如果没有要生成的目标， CMake 就不会执行任何命令。**无论 CMake 结构看起来多么复杂或可怕，找出这个 CMake 正在构建的目标，一切都会变得简单明了。**
 
-> CMake is a very deep rabbit hole, which is also the reason I want to minimize the amount of content in this chapter. How deep you decide to dig down is up to you. Good luck and have fun.
+记住到这一点，你应该能够理解大多数的 CMake 教程。
 
-## Why PC can compile against MCU (Cross-compile and Toolchain)
+> CMake 是一个无底深坑，这也是我想尽量压缩本章内容的原因。要在坑里挖多深取决于你自己。GLHF。
 
-To compile a source file to an executable. We can simply do:
+## 为什么电脑可以针对单片机进行编译（交叉编译和工具链）
+
+要将源文件编译为可执行文件。我们可以简单地执行以下操作：
 
 ```bash
 gcc main.c
 ```
 
-Recall the very beginning of our **chapter 1: compile from commandline on PC**, we know that:
+回想一下**第 1 章：在电脑上从命令行进行编译**的开头，我们知道：
 
-1. Different MCU/CPUs speak different machine code
-2. Executable for one platform (CPU + OS) cannot run on another platform.
+1. 不同的单片机/CPU使用不同的机器代码
+2. 一个平台（CPU + 操作系统）的可执行文件无法在另一个平台上运行。
 
-Wait! When we compile for a embedded system on our computers, how can the program run on the embedded MCU even if it is compiled on a PC? The answer is what we called **cross-compile**.
+等下！当我们在计算机上为嵌入式系统编译时，我们在电脑上编译，程序是如何能在单片机上运行的？答案就是所谓的**交叉编译**。
 
-Let's examine the difference between **compile** and **cross-compile**:
+让我们看看**编译**和**交叉编译**之间的区别：
 
 ![](./resource/cross_compile.png)
 
-> This graph is not quite accurate as `.elf` does not directly run on bare-metal embedded system and extra post-processing steps are needed.
+> 该图不太准确，因为 `.elf` 不直接在裸机嵌入式系统上运行，需要额外的后处理步骤。
 
-For a source file `.c`, if we want to run it on our PC, we compile it with `gcc`; if we want to run it on our ARM architecture embedded system MCU, we cross-compile it with `arm-gcc`, a cross-compiler on our PC, and then generated executable can run on our embedded system.
+对于一个源文件 `.c`，如果我们想在电脑上运行它，我们会用 `gcc` 编译它；如果我们想在 ARM 架构的单片机上运行它，我们会用电脑上的交叉编译器 `arm-gcc` 进行交叉编译，然后生成的可执行文件就可以在嵌入式系统上运行。
 
-`arm-gcc`, the cross-compiler, is one of the **cross-compiling toolchain** provided by the architecture designer. If we are using ARM MCUs, we can get our cross-compiling toolchain from ARM: [ARM Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads). This is a GNU Arm Toolchain, meaning it is an variation of the `gcc` family we've been talking about in the previous chapters and compatible to `makefile` and `CMake`. The usage is exactly the same as compiling against our PC.
+交叉编译器 `arm-gcc` 是芯片架构设计者提供的 **交叉编译工具链** 之一。如果我们使用的是 ARM 架构的单片机，我们可以从 ARM 获取我们的交叉编译工具链：[ARM Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads). 这是一个 GNU Arm Toolchain，这意味着它是我们在前面章节中讨论过的 `gcc` 家族的一个变体，并且与 `makefile` 和 `CMake` 兼容。其使用方法与一般的在电脑上编译是完全相同的。
 
-#### Example:
+#### 比方说：
 
-Suppose our PC is x86-64 Ubuntu and our MCU is ARM architecture STM32F4. This is a **bare-metal target**, which means it doesn't have any operating systems on it. So the cross-compiling toolchain we get is `x86_64 Linux hosted cross toolchains AArch32 bare-metal target (arm-none-eabi)` and our cross-compiler is `arm-none-eabi-gcc`.
+比如我们的电脑是 x86-64 Ubuntu，我们的单片机是 ARM 架构 STM32F4。这是一个**裸机目标**，这意味着它上面没有任何操作系统。所以我们知道应该使用 `x86_64 Linux 上的，针对 AArch32 架构裸机目标的交叉工具链 (arm-none-eabi)`，我们的交叉编译器是 `arm-none-eabi-gcc`。
 
-We can call it just like `gcc`:
+我们可以像 `gcc` 一样调用它：
 
 ```bash
 arm-none-eabi-gcc main.c -o main
 ```
 
-But it won't do much things. Remember we need all those 4 layers libraries? We need to use `CMake` sooner or later. To use these in our `CMake` script, add the following commands:
+但这个程序不会做太多事情。还记得我们需要所有的 4 层库吗？我们迟早需要使用 `CMake`。要在我们的 `CMake` 脚本中使用这些交叉编译器，可以添加以下命令：
 
 ```cmake
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 ```
 
-These commands change the default compiler for `CMake` from `gcc` to `arm-none-eabi-gcc` and the generated commands will compile with `arm-none-eabi-gcc`.
+这些命令将 `CMake` 的默认编译器从 `gcc` 更改为 `arm-none-eabi-gcc`，生成的命令将使用 `arm-none-eabi-gcc` 进行编译。
 
-The compiled result from arm toolchain compiler is a `.elf` file we discussed in the first chapter.
+arm 工具链编译器编译的生成结果是我们在第一章中讨论过的 `.elf` 文件。
 
-> Sometimes this result file is also referred as a `.axf` file, ARM executable file.
+> 有时这个文件也称为 `.axf` 文件，即 ARM 可执行文件（ARM executable file）。
 
-An `.elf` file contains information for operating system about relocation: how to place different sections of data and code into memory. A bare-metal embedded MCU cannot interpret these information so we need to make everything fixed before loading the program.
+一个`.elf` 文件包含有关重定位（relocation）的为操作系统准备的信息，指导操作系统如何将数据和代码的不同部分放入内存。裸机嵌入式单片机无法理解这些信息，因此我们需要在加载程序之前解决这个问题。
 
-The tool we use here is `objcopy`, it converts `.elf` file into binary files `.bin` or `.hex`.
+这里我们使用的工具是 `objcopy`，它可以把 `.elf` 文件转换为二进制文件 `.bin` 或 `.hex`。
 
 ```bash
 arm-none-eabi-objcopy -Obinary intput.elf output.bin
 ```
 
-Now we can load the program into our MCU. Here we use the open source `stlink` library:
+现在我们可以将程序烧录到我们的单片机中了。我们使用开源的 `stlink` 库：
 
 ```bash
 st-flash --reset write output.bin 0x8000000
 ```
 
-Here `0x8000000` is the start address used by our MCU `STM32F4`. For different MCUs, we need to consult the chip technical manual for this flash address. An MCU always start running code from this address after a reset.
+这里的 `0x8000000` 是我们的单片机`STM32F4` 的起始地址。对于不同的 单片机，我们需要查阅芯片技术手册来获得这个烧录地址。单片机在重置后永远是从这个地址开始运行代码的。
 
-## What's inside a loader/debug probe/emulator
+## 烧录器/调试器/仿真器里面有什么
 
-As the one last step to load and debug code in a MCU, we need a "loader". It looks something like this:
+作为在单片机中烧录和调试代码的最后一步，我们需要一个“烧录器”。它看起来像这样：
 
 <img src="./resource/st-link-v2.jpg" alt="Source: https://www.amazon.com/CANADUINO-Compatible-Circuit-Programmer-Debugger/dp/B07B2K6ZPK" height="200"/>
 
@@ -380,133 +382,128 @@ As the one last step to load and debug code in a MCU, we need a "loader". It loo
 <br>
 <br>
 
-There are many names for them.
-- Loader
-- Flasher
-- FTDI chip
-- SWD chip or JTAG chip
-- Debug probe
-- Emulator
+它们有很多名字。
+- 烧录器
+- FTDI 芯片
+- SWD 芯片或 JTAG 芯片
+- 调试器
+- 仿真器
 
-We will explain why each name makes sense later in this chapter. Let's first look at how they connect to our hardware.
+我们将在本章随后逐个解释每个名称的意义，现在让我们先看看它们是如何连接到我们的硬件的。
 
-On the PC side, the connector is usually a USB. On the embedded side, depending on the chip manufacturer, we can have many choices.
+在电脑端一般是USB接口，在嵌入式端，根据芯片制造商的不同，我们可以有很多选择：
 
-- Texas Instruments 20 pin and 14 pin JTAG connector.
-- ARM 20 pin JTAG connector.
-- STMicroelectronics SWD connector.
+- TI 20 针和 14 针 JTAG 接口。
+- ARM 20 针 JTAG 接口。
+- ST SWD 接口。
 
 
 #### JTAG
 
 ![Source: https://twosixtech.com/blog/running-a-baremetal-beaglebone-black-part-1/](./resource/Ti_arm_jtag.jpg)
 
+JTAG 并非专门为单片机调试而发明的。它的设计初衷是检测芯片的所有引脚是否正确焊接。这项测试被称为“边界扫描”。
 
+JTAG 应当可以设置系统中的所有的寄存器或引脚的值。如果我们想使用 JTAG 进行调试，我们会在设计系统时把所有芯片都通过 JTAG 数据线链接，然后我们开始为每个引脚注入数据。
 
-JTAG was not invented specificly for MCU debugging. It was designed to detect whether all pins of a IC is properly soldered. This is known as "boundary scan".
+当 JTAG 为系统中所有芯片的所有引脚设置值时，我们注入的位数应该等于系统中的引脚数。通过查看结果（如果注入的位数和系统中的引脚数两个数字相等），我们就知道芯片是否正确焊接。一些人说 JTAG 是为“边界扫描”而设计的，他们指的就是这个过程。
 
-JTAG should be able to set values for all registers/pins in the system. If we want to use JTAG to debug, we design the system such that all ICs are chained by the JTAG data line. Then we propagate data for each pin.
+当我们说“JTAG”时，我们指的是 独立于被测试芯片的传播 JTAG 数据的debug硬件 + 从 JTAG 硬件到被测试芯片的物理连接，这两者的总和。
 
-The number of bits we propagated should equals the the number of pins in the system when JTAG sets values for all pins of all the ICs in the system. By looking at the result (if the 2 numbers match) we will know if the ICs are properly soldered. When people say JTAG is designed for "boundary scan", this process is what they refer to.
+> 当然，JTAG 要求被测试芯片在其设计中包含一些 JTAG 电路才能用。与调试成本相比，这真的很小的代价了。
 
-When we say "JTAG", we are refering to the collection of the external debug hardware to propagate JTAG data + the connection from the JTAG hardware to the ICs.
+这是我找到的最好的 JTAG 入门教学：`https://www.fpga4fun.com/JTAG1.html`
 
-> Of course, JTAG requires ICs to include some JTAG circuits as part of their design to work, which is a small cost compared to debugging cost.
+#### SWD（与 JTAG 相比）
 
-This is the best JTAG introduction I've found: `https://www.fpga4fun.com/JTAG1.html`
+如果您从未使用过 ARM 芯片，您可能从未听说过 SWD（Serial Wire Debug）连接器。SWD 是 JTAG 的修改版本，仅用于 STM32 等 ARM Cortex 芯片。
 
-
-#### SWD (vs JTAG)
-
-If you never worked with ARM chips you've probably never heard of SWD (serial wire debug) connector. SWD is modified version JTAG and only used on ARM Cortex chips like STM32.
-
-SWD is built on top of JTAG. So if a chip supports SWD, it also supports JTAG. SWD needs 2 data pins: `SWDIO` and `SWDCLK`. JTAG needs 4 data pins: `TMS`, `TCLK`, `TDO`, and `TDI`. In fact, some of their pins are compatible (`SWDIO == TMS`, `SWDCLK == TCLK`) and that why you may sometimes see connectors that can be used for both SWD and JTAG.
+SWD 建立在 JTAG 之上。因此，如果芯片支持 SWD，它也支持 JTAG。SWD 需要 2 个引脚：`SWDIO` 和 `SWDCLK`。JTAG 需要 4 个引脚：`TMS`、`TCLK`、`TDO` 和 `TDI`。事实上，它们的一些引脚是兼容的（`SWDIO == TMS`，`SWDCLK == TCLK`），这就是为什么你有时会看到可以同时用于 SWD 和 JTAG 的连接器。
 
 <img src="./resource/JTAG_SWD_Connector.png" alt="Source: https://wiki-power.com/en/SWD%E4%B8%8EJTAG%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8E%E8%81%94%E7%B3%BB/" height="200"/><br>
 
-For chips supporting both debug ports, they default to JTAG on a cold boot and switch to SWD by sending a 50 clock cycle reset high, a 16 bit command sequence, and another 50 clock cycle reset high.
+对于支持两种接口的芯片，它们在冷启动时默认为 JTAG，只有在复位线上收到 50 个时钟周期的高电平，一个 16 位的命令帧，再加一个 50 个时钟周期的复位线上的高电平，才会切换到 SWD模式。
 
-#### Different names for the same thing...
+#### 同一个东西，不同的名字...
 
-We discussed in the very beginning of this chapter that there are many names for these loaders. Let's see where they all came from.
+我们在本章一开始就说过，这些烧录器有很多名称。现在让我们逐个解释它们都出自哪里。
 
-**Loader/Flasher**:
+**烧录器(Loader/Flasher)**：
 
-This is a straightforward one. Most MCUs, on reset, will start to execute code from a fixed address. For STM32 as an example, the address is `0x80000000`. When loading a program, we load the beginning of the program to the starting address of the MCU. That's why it's called a loader.
+这个比较直接。大多数单片机在重置时会从固定地址开始执行代码。以 STM32 为例，地址为 `0x80000000`。加载程序时，我们将程序的开头烧录到单片机的起始地址。这就是为什么它被称为烧录器。
 
-Flash is a common storage unit for embedded systems and writing to a flash makes the name "flasher".
+**SWD/JTAG 芯片**：
 
-**SWD/JTAG chip**:
+这些是我们在上一部分讨论过的用于调试的 2 种接口的名称。
 
-These are the names of the 2 connectors used for debugging as we discussed in the last part.
+**调试器/仿真器 (Debug probe/Emulator)**
 
-**Debug probe/Emulator**
+要解释调试器和仿真器之间的区别稍微有点麻烦。要解释这一点，我们首先要知道为什么烧录器有时被称为 **FTDI 芯片**。 FTDI 是一家以其 USB-JTAG 芯片（FT2232 系列）而闻名的芯片公司，其公司名已经牢牢与与 USB-JTAG 芯片绑定在了一起。
 
-The difference between a debug probe and a emulator is a little tricky. To explain this, we first need to know why loaders are sometimes called **FTDI chips**. FTDI is a chip company widely known for their USB-JTAG chips (FT2232 series) and their name is tightly binded to USB-JTAG chips.
+回想一下上一节关于 JTAG 的内容，我们知道 JTAG 可以将程序加载到内存中：因为我们知道 JTAG 可以为系统中的所有寄存器设置值，其中包括“内存地址寄存器 (MAR)”和“内存数据寄存器 (MDR)”。也就是说，JTAG 可以通过正确的输入组合将访问任意内存地址，再把任意值写进这个地址。我们的代码也可以这样被写入内存。
 
-Recall from the previous part on JTAG, we know JTAG can load programs into memory. This is because we know that JTAG can set value for all registers in the system and that includes `memory address register (MAR)` and `memory data register (MDR)`. That's said, JTAG can set any value to any memory address with the right input, and that "any value" in memory can be our code.
-
- If we only want to load the program to the MCU (or, a loader), a JTAG chip (FTDI chip) and some software drivers on PC is all we need. However, when we look at a loader, it sometimes has more ICs than only a FTDI (JTAG) chip. What are these then?
+如果我们只想将程序烧录到单片机，那么我们只需要一个 JTAG 芯片（FTDI 芯片）和电脑上的配套的软件驱动。但是，如果我们仔细观察查看烧录器，我们会发现它除了 FTDI（JTAG）芯片还有其他的芯片。那么这些是什么？
 
 <img src="./resource/tms320-xds100-v3.jpg" alt="Source: https://olimex.wordpress.com/2012/04/26/tms320-xds100-v3-prototypes-are-ready/" height="200"/><br>
 
+上图是德州仪器 TMS320 系列单片机的 XDS100v3 烧录器/调试器。白色方块中较小的芯片是 FTDI 芯片（FT2232H）。那这个较大的芯片是做什么用的？答案是添加断点进行调试用的。
 
+当断点被添加时，我们需要看着程序计数器的值，并在地址等于断点地址时停止程序。这在电脑上是一件很容易事，但在嵌入式系统中，我们始终是需要外部硬件来添加这些断点的。有些 MCU 含有特殊的内部电路允许用户添加断点，但这种硬件可以添加的断点数量通常非常有限。
 
-The picture above is a XDS100v3 loader/debugger for Texas Instruments TMS320  MCU series. The smaller chip in the white sqaure is a FTDI chip (FT2232H). What is this larger chip for? To add breakpoints for debugging.
+>对于 TMS320F2837 单片机，我们在没有任何外部硬件的情况下最多只能添加两个断点。
 
-When a breakpoint is added, we need to watch the value of the program counter, and stop the program when the address equals to the breakpoint address. Although this is an easy task on PC, in embedded systems, you need external hardwares to add these breakpoints. Some MCUs allow you to add breakpoints with internal circuits, but the number of breakpoints you can add is usually very limited.
+因此，烧录器在目标单片机和 FTDI 芯片之间添加了另一个中间单片机。当我们向目标单片机发送 JTAG“命令”时，中间单片机会捕获该命令并根据这些命令控制目标单片机。当需要更多断点时，中间单片机使用其内存记录所有断点地址，并在程序计数器中的地址匹配断点地址时停下目标单片机的运行。**由于烧录器上的这个中间单片机仿真了目标单片机，使得 JTAG 像直接在控制目标单片机一样，因此烧录器也被称为仿真器。**
 
->For MCU TMS320F2837, the number of breakpoints we can add without any external hardware is 2.
-
-Thus, loaders add another middle MCU between the target MCU and the FTDI chip. When we send JTAG "commands" to the target MCU, the middle MCU capture the command and control the target MCU accordingly. When more breakpoints are required, the middle MCU uses its memory to record all the breakpoint addresses and stop the target MCU when the address in the program counter matches. **Since this middle MCU on the loader is acting as if the JTAG is directly controlling the target MCU (emulating), the loader is called an emulator.**
-
-For some MCU families, the FTDI chip and the middle chip is combined into one. For example, the ST-link for STM32 series.
+对于某些单片机系列，中间芯片还承担了 USB-JTAG 转换的工作，因此不需要 FTDI 芯片。例如，STM32 系列的 ST-link。
 
 <img src="./resource/st-link-v2-mini-1_1_5.jpg" alt="Source: https://www.waveshare.com/st-link-v2-mini-stm32.htm" height="200"/>
 <br><br>
 
-## How debugging works (OpenOCD, GDB, gdb server)
+## 调试是什么原理（OpenOCD、GDB、gdb server）
 
-`GDB` (GNU Debugger) is a very important tool for debugging. There are many tutorials about it. Like [this lecture slide](https://www.cs.umd.edu/~srhuang/teaching/cmsc212/gdb-tutorial-handout.pdf) from University of Maryland or [this one page reference sheet](https://web.eecs.umich.edu/~sugih/pointers/summary.html) from University of Michigan.
+`GDB`（GNU Debugger）是一个非常重要的调试工具。有很多关于它的优秀教程。比如University of Maryland的 [这个讲义](https://www.cs.umd.edu/~srhuang/teaching/cmsc212/gdb-tutorial-handout.pdf) 或University of Michigan的 [这个一页参考单](https://web.eecs.umich.edu/~sugih/pointers/summary.html)。
 
-Most intro level GDB tutorials only talk about debugging local program, which compiles, runs, and debugs all on your computer. For a program loaded into embedded MCUs, we know it compiles on your computer, but doesn't run on your computer. From the previous chapter we know we can debug it with a debug probe, but how do we do that?
+大多数 GDB 入门教程仅讨论调试本地程序，一些在你的计算机上编译、运行和调试的程序。对于加载到单片机中的程序，我们知道它会在你的计算机上编译，但不会在你的计算机上运行。从上一章我们知道我们可以使用调试器对其进行调试，但具体该怎么做呢？
 
-If we want to debug our MCU through the debug probe with GDB and GDB commands, we need a software middle-man between GDB and debug probe. The thing we are looking for is called a **GDB server**. It reads GDB commands sent to a port* and translate it to corresponding commands of the debug probe.
+如果我们想通过调试器使用 GDB 和 GDB 指令调试我们的单片机，我们就需要 GDB 和调试器之间的软件中间人。我们要找的东西叫做 **GDB 服务器(server)**。它读取发送到端口*的 GDB 指令并将其转换为调试器的相应指令。
 
->*socket port, which means you can debug a MCU through network remotely.
+>*socket端口，也就是说你可以通过网络远程调试单片机。
 
-The GDB server we use here as an example is **OpenOCD**. Since there are so many different debug probes, we need to find the **debug probe configuration file** for our debug probe. OpenOCD comes with many common debug probe config files including the one we are using for example: `st-link-v2.1`.
+我们在这里用作示例的 GDB 服务器是 **OpenOCD**。世界上有这么多不同的调试器，我们需要找到我们的调试器的 **调试器配置文件**来告诉OpenOCD我们用的是哪一种。 OpenOCD 附带许多常见的调试器配置文件，例如我们正在使用的配置文件：`st-link-v2.1`。
 
-To set up the GDB server:
+要设置 GDB 服务器：
 
 ```bash
 openocd -f st-link-v2-1.cfg
 ```
 
-If debug probe is connected to our computer, OpenOCD should detect it and wait for GDB to connect.
+如果调试器已连接到我们的电脑，OpenOCD 应该会检测到并开始等待 GDB 的连接。
 
-1. Suppose we compiled our program as output.elf
+1. 假设我们将程序编译为 output.elf
 ```bash
 arm-none-eabi-gcc -g main.c -o output.elf
 ```
 
-2. To launch the GDB:
+2. 要启动 GDB：
 ```bash
 arm-none-eabi-gdb output.elf
 ```
-This gives the program we are debugging to GDB. Notice that we have not loaded this program into the MCU. Loading will be done by GDB + OpenOCD in step 4.
 
-3. Run GDB command:
+这会将我们正在调试的程序提供给 GDB。注意这时我们尚未将此程序烧录到单片机中。烧录将在步骤4时，由 GDB + OpenOCD 完成。
+
+3. 运行 GDB 命令：
 ```bash
 target extended-remote : 3333
 ```
-This let GDB connects to GDB server at port 3333, which is the default port of OpenOCD. `extended-remote` makes sure that even the program on the MCU ends, GDB doesn't quit connection with gdbserver so we can restart the program on the MCU. On the other hand, `target remote: 3333` will quit once the program finishes.
 
-4. Run GDB Command:
+这让 GDB 连接到端口 3333 上的 GDB 服务器，这是 OpenOCD 的默认端口。`extended-remote` 确保即使 单片机上的程序结束，GDB 也不会退出与 gdbserver 的连接，这让我们的得以多次运行单片机上的程序。相比之下，`target remote: 3333` 一旦程序完成就会退出。
+
+4. 运行 GDB 命令：
 ```bash
 load
 ```
-This will load the program we are debugging to our MCU. From here we can debug in GDB the same as debugging any other program.
+
+这会将我们正在调试的程序烧录到单片机上。从这里我们就可以像调试任何其他程序一样在 GDB 中进行调试了。
 
 
 ## Case analysis with `illini-robomaster`
