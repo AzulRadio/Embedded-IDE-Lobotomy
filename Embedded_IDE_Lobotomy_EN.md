@@ -238,9 +238,9 @@ build/main.elf: hello.c main.c
 
 `build/main.elf` is the **target** (which is the most important concept for both makefile and CMake). For every target in the makefile script, `make` will check whether it exists and execute the command **only** if the target doesn't exist.
 
-`hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. If we have a dependency tree, only building necessary files will save a lot of time.
+`hello.c` and `main.c` are the **dependencies**. `make` will also execute the command if these files are changed since last build. `make` keeps track of a dependency tree and it only builds necessary files to save time on compiling.
 
-Command is just command. Notice it has to be a `tab` before the command and cannot be `whitespace`.
+`gcc ...` is just command. Notice it has to be a `tab` before the command and cannot be `whitespace`.
 
 Now we know the 2 conditions for a command to run: **target doesn't exist or dependencies are changed**. We can write some interesting makefile scripts.
 
@@ -257,7 +257,7 @@ If we run `make clean`, `makefile` will look for a file called `clean` in the cu
 
 #### CMake
 
-CMake is when our makefile is so long that we need to write another script to generate the makefile script. While `makefile` looks for a file named `makefile` in the current directory, `CMake` looks for a file named `CMakeLists.txt`. The most common use case is:
+CMake kicks in when our makefile is so long that we need to write another script to generate the makefile script. Like `makefile` looks for a file named `makefile` in the current directory, `CMake` looks for a file named `CMakeLists.txt`. The most common use case is:
 
 ```bash
 mkdir build
@@ -266,14 +266,13 @@ cmake ..
 make <your target name>
 ```
 
-
 Many tutorials on CMake focus too much on usage details which, in my opinion, makes them confusing and wordy. When you read these tutorials, keep in mind one thing: **(like makefile), CMake is all about targets**.
 
-Remember makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles. **If no targets are defined, no action will be taken by this CMake.**
+Recall that makefile is all about targets and every line in makefile is about generating one target. CMake generates makefiles. **If no targets are defined, this CMake will not do anything.**
 
 **There are only 3 functions that defines targets in CMake**:
 
-```Python
+```cmake
 # Executables that you can generate with GCC or GCC-like compilers
 add_executable()
 
@@ -299,7 +298,7 @@ add_custom_target(flash-${name}
 
 That's it. All about targets. That's core idea about CMake. No matter how many variables you defined or how many `execute_process()` you added, if there is no target to be generated, none of the CMake commands will be executed. **No matter how complex or scary the CMake structure looks, find out what targets this CMake is building and everything will be simple and clear.**
 
-With that in mind you should be able to understand most of the CMake tutorials available.
+With that in mind you should be able to understand most of the CMake tutorials.
 
 > CMake is a very deep rabbit hole, which is also the reason I want to minimize the amount of content in this chapter. How deep you decide to dig down is up to you. Good luck and have fun.
 
@@ -338,7 +337,7 @@ We can call it just like `gcc`:
 arm-none-eabi-gcc main.c -o main
 ```
 
-But it won't do much things. Remember we need all those 4 layers libraries? We need to use `CMake` sooner or later. To use these in our `CMake` script, add the following commands:
+But this program won't do much things. Remember we need all those 4 layers libraries? We need to use `CMake` sooner or later. To use cross compilers in our `CMake` script, add the following commands:
 
 ```cmake
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
@@ -405,9 +404,9 @@ JTAG was not invented specificly for MCU debugging. It was designed to detect wh
 
 JTAG should be able to set values for all registers/pins in the system. If we want to use JTAG to debug, we design the system such that all ICs are chained by the JTAG data line. Then we propagate data for each pin.
 
-The number of bits we propagated should equals the the number of pins in the system when JTAG sets values for all pins of all the ICs in the system. By looking at the result (if the 2 numbers match) we will know if the ICs are properly soldered. When people say JTAG is designed for "boundary scan", this process is what they refer to.
+The number of bits we propagated should equals the the number of pins in the system when JTAG sets values for all pins of all the ICs in the system. By looking at the result (if the 2 numbers match) we will know if the ICs are properly soldered. When people say JTAG is designed for "boundary scan", they are referring to this process.
 
-When we say "JTAG", we are refering to the collection of the external debug hardware to propagate JTAG data + the connection from the JTAG hardware to the ICs.
+When we say "JTAG", we are refering to both the external debug hardware to propagate JTAG data + the physical connection from the JTAG hardware to the ICs under test.
 
 > Of course, JTAG requires ICs to include some JTAG circuits as part of their design to work, which is a small cost compared to debugging cost.
 
@@ -442,9 +441,9 @@ These are the names of the 2 connectors used for debugging as we discussed in th
 
 The difference between a debug probe and a emulator is a little tricky. To explain this, we first need to know why loaders are sometimes called **FTDI chips**. FTDI is a chip company widely known for their USB-JTAG chips (FT2232 series) and their name is tightly binded to USB-JTAG chips.
 
-Recall from the previous part on JTAG, we know JTAG can load programs into memory. This is because we know that JTAG can set value for all registers in the system and that includes `memory address register (MAR)` and `memory data register (MDR)`. That's said, JTAG can set any value to any memory address with the right input, and that "any value" in memory can be our code.
+Recall from the previous part on JTAG, we know JTAG can load programs into memory. This is because we know that JTAG can set value for all registers in the system and that includes `memory address register (MAR)` and `memory data register (MDR)`. That's said, JTAG can access any memory address with the correct input combination. Then set any value to this memory address. Our code can also be written into the memory in this way.
 
- If we only want to load the program to the MCU (or, a loader), a JTAG chip (FTDI chip) and some software drivers on PC is all we need. However, when we look at a loader, it sometimes has more ICs than only a FTDI (JTAG) chip. What are these then?
+ If we only want to load the program to the MCU, a JTAG chip (FTDI chip) and some software drivers on PC is all we need. However, when we look at a loader, it sometimes has more ICs than only a FTDI (JTAG) chip. What are these then?
 
 <img src="./resource/tms320-xds100-v3.jpg" alt="Source: https://olimex.wordpress.com/2012/04/26/tms320-xds100-v3-prototypes-are-ready/" height="200"/><br>
 
@@ -458,7 +457,7 @@ When a breakpoint is added, we need to watch the value of the program counter, a
 
 Thus, loaders add another middle MCU between the target MCU and the FTDI chip. When we send JTAG "commands" to the target MCU, the middle MCU capture the command and control the target MCU accordingly. When more breakpoints are required, the middle MCU uses its memory to record all the breakpoint addresses and stop the target MCU when the address in the program counter matches. **Since this middle MCU on the loader is acting as if the JTAG is directly controlling the target MCU (emulating), the loader is called an emulator.**
 
-For some MCU families, the FTDI chip and the middle chip is combined into one. For example, the ST-link for STM32 series.
+For some MCU families, the middle chip also does the job of USB-JTAG conversion so the FTDI chip is not needed. For example, the ST-link for STM32 series.
 
 <img src="./resource/st-link-v2-mini-1_1_5.jpg" alt="Source: https://www.waveshare.com/st-link-v2-mini-stm32.htm" height="200"/>
 <br><br>
@@ -473,7 +472,7 @@ If we want to debug our MCU through the debug probe with GDB and GDB commands, w
 
 >*socket port, which means you can debug a MCU through network remotely.
 
-The GDB server we use here as an example is **OpenOCD**. Since there are so many different debug probes, we need to find the **debug probe configuration file** for our debug probe. OpenOCD comes with many common debug probe config files including the one we are using for example: `st-link-v2.1`.
+The GDB server we use here as an example is **OpenOCD**. Since there are so many different debug probes, we need to find the **debug probe configuration file** for our debug probe to tell OpenOCD which one we are using. OpenOCD comes with many common debug probe config files including the one we are using for example: `st-link-v2.1`.
 
 To set up the GDB server:
 
@@ -498,7 +497,7 @@ This gives the program we are debugging to GDB. Notice that we have not loaded t
 ```bash
 target extended-remote : 3333
 ```
-This let GDB connects to GDB server at port 3333, which is the default port of OpenOCD. `extended-remote` makes sure that even the program on the MCU ends, GDB doesn't quit connection with gdbserver so we can restart the program on the MCU. On the other hand, `target remote: 3333` will quit once the program finishes.
+This let GDB connects to GDB server at port 3333, which is the default port of OpenOCD. `extended-remote` makes sure that even the program on the MCU ends, GDB doesn't quit connection with gdbserver so we can restart the program on the MCU. In comparsion, `target remote: 3333` will quit once the program finishes.
 
 4. Run GDB Command:
 ```bash
