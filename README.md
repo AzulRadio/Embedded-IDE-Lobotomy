@@ -61,7 +61,7 @@ I'm sure you know what you are doing if you read this far. Hope you have fun rea
 
 一份不用IDE进行嵌入式编程的新手指南。
 
-[中文版点此（翻译进行中）](./Embedded_IDE_Lobotomy_ZH.md)
+[中文版点此](./Embedded_IDE_Lobotomy_ZH.md)
 
 如果你有一些嵌入式编程的经历，你大概会同意使用IDE并不是一件特别愉快的事。Code Composer Studio, Keil, 或者STM32CubeIDE……他们很不灵活，也很难搞清楚GUI之下到底在发生些什么。
 
